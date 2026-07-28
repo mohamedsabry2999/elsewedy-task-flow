@@ -54,30 +54,48 @@ export type Database = {
       }
       profiles: {
         Row: {
+          archived_at: string | null
           avatar_url: string | null
+          branch: string | null
           created_at: string
+          department: string | null
           email: string
           full_name: string
           id: string
           is_active: boolean
+          job_title: string | null
+          last_sign_in_at: string | null
+          phone: string | null
           updated_at: string
         }
         Insert: {
+          archived_at?: string | null
           avatar_url?: string | null
+          branch?: string | null
           created_at?: string
+          department?: string | null
           email: string
           full_name?: string
           id: string
           is_active?: boolean
+          job_title?: string | null
+          last_sign_in_at?: string | null
+          phone?: string | null
           updated_at?: string
         }
         Update: {
+          archived_at?: string | null
           avatar_url?: string | null
+          branch?: string | null
           created_at?: string
+          department?: string | null
           email?: string
           full_name?: string
           id?: string
           is_active?: boolean
+          job_title?: string | null
+          last_sign_in_at?: string | null
+          phone?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -121,29 +139,38 @@ export type Database = {
         Row: {
           created_at: string
           file_name: string
+          file_size: number | null
           file_url: string
           id: string
           kind: string
+          mime_type: string | null
           task_id: string
           uploader_id: string
+          version: number
         }
         Insert: {
           created_at?: string
           file_name: string
+          file_size?: number | null
           file_url: string
           id?: string
           kind?: string
+          mime_type?: string | null
           task_id: string
           uploader_id: string
+          version?: number
         }
         Update: {
           created_at?: string
           file_name?: string
+          file_size?: number | null
           file_url?: string
           id?: string
           kind?: string
+          mime_type?: string | null
           task_id?: string
           uploader_id?: string
+          version?: number
         }
         Relationships: [
           {
@@ -160,24 +187,43 @@ export type Database = {
           author_id: string
           body: string
           created_at: string
+          edited_at: string | null
           id: string
+          is_internal: boolean
+          is_pinned: boolean
+          parent_id: string | null
           task_id: string
         }
         Insert: {
           author_id: string
           body: string
           created_at?: string
+          edited_at?: string | null
           id?: string
+          is_internal?: boolean
+          is_pinned?: boolean
+          parent_id?: string | null
           task_id: string
         }
         Update: {
           author_id?: string
           body?: string
           created_at?: string
+          edited_at?: string | null
           id?: string
+          is_internal?: boolean
+          is_pinned?: boolean
+          parent_id?: string | null
           task_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "task_comments_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "task_comments"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "task_comments_task_id_fkey"
             columns: ["task_id"]
@@ -289,6 +335,33 @@ export type Database = {
           task_code?: string | null
           task_name?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      user_permission_overrides: {
+        Row: {
+          created_at: string
+          id: string
+          permission_key: string
+          updated_at: string
+          user_id: string
+          value: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          permission_key: string
+          updated_at?: string
+          user_id: string
+          value: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          permission_key?: string
+          updated_at?: string
+          user_id?: string
+          value?: string
         }
         Relationships: []
       }
