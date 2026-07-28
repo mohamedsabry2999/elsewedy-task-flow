@@ -818,3 +818,367 @@ function ColumnsEditorDialog({ template }: { template: any }) {
     </Dialog>
   );
 }
+
+// ============================================================
+// PHASE 4 — CUSTOM FIELDS EDITOR
+// ============================================================
+
+type FieldType = "text" | "textarea" | "number" | "date" | "select" | "checkbox" | "url";
+type FieldDef = {
+  key: string;
+  label_ar: string;
+  type: FieldType;
+  required?: boolean;
+  visible?: boolean;
+  order?: number;
+  options?: string[]; // for select
+  placeholder?: string;
+  help?: string;
+};
+
+const FIELD_TYPE_LABELS: Record<FieldType, string> = {
+  text: "نص قصير",
+  textarea: "نص طويل",
+  number: "رقم",
+  date: "تاريخ",
+  select: "قائمة اختيار",
+  checkbox: "مربع اختيار",
+  url: "رابط",
+};
+
+function slugifyKey(v: string) {
+  const base = v.trim().toLowerCase()
+    .replace(/[^a-z0-9\u0600-\u06FF]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  return base || `field_${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function FieldsEditorDialog({ template }: { template: any }) {
+  const qc = useQueryClient();
+  const updFn = useServerFn(updateTemplate);
+  const [open, setOpen] = useState(false);
+  const initial: FieldDef[] = Array.isArray(template.fields_config) ? template.fields_config : [];
+  const [fields, setFields] = useState<FieldDef[]>(
+    [...initial].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+  );
+
+  const mut = useMutation({
+    mutationFn: () => updFn({ data: { id: template.id, patch: {
+      fields_config: fields.map((f, i) => ({ ...f, order: i + 1 })),
+    } } }),
+    onSuccess: () => {
+      toast.success("تم حفظ الحقول");
+      qc.invalidateQueries({ queryKey: ["structure-templates"] });
+      setOpen(false);
+    },
+    onError: (e: any) => toast.error(e.message || "فشل الحفظ"),
+  });
+
+  function addField() {
+    const idx = fields.length + 1;
+    setFields((p) => [...p, {
+      key: `custom_${idx}`,
+      label_ar: `حقل ${idx}`,
+      type: "text",
+      required: false,
+      visible: true,
+      order: idx,
+    }]);
+  }
+  function updateField(i: number, patch: Partial<FieldDef>) {
+    setFields((p) => p.map((f, idx) => idx === i ? { ...f, ...patch } : f));
+  }
+  function removeField(i: number) {
+    setFields((p) => p.filter((_, idx) => idx !== i));
+  }
+  function move(i: number, dir: -1 | 1) {
+    const j = i + dir;
+    if (j < 0 || j >= fields.length) return;
+    setFields((p) => {
+      const arr = [...p];
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+      return arr;
+    });
+  }
+  function resetOpen(o: boolean) {
+    setOpen(o);
+    if (o) setFields([...initial].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)));
+  }
+
+  const dupKey = (() => {
+    const seen = new Set<string>();
+    for (const f of fields) {
+      const k = (f.key || "").trim();
+      if (!k) return "empty";
+      if (seen.has(k)) return k;
+      seen.add(k);
+    }
+    return null;
+  })();
+
+  return (
+    <Dialog open={open} onOpenChange={resetOpen}>
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline"><ListPlus className="h-3.5 w-3.5 ml-1" /> الحقول</Button>
+      </DialogTrigger>
+      <DialogContent dir="rtl" className="max-w-3xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>الحقول الإضافية — {template.name}</DialogTitle>
+        </DialogHeader>
+        <div className="text-xs text-muted-foreground pb-2">
+          الحقول الإضافية تُخزَّن كبيانات مرنة للتاسك وتظهر في نموذج التاسك عند تطبيق القالب.
+        </div>
+        {fields.length === 0 ? (
+          <div className="text-sm text-muted-foreground text-center py-6">
+            لا توجد حقول إضافية. اضغط "إضافة حقل".
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {fields.map((f, i) => (
+              <div key={i} className={`border rounded-md p-3 space-y-2 ${f.visible === false ? "opacity-60" : ""}`}>
+                <div className="flex items-center gap-2">
+                  <div className="flex flex-col gap-0.5">
+                    <Button size="sm" variant="ghost" className="h-5 w-5 p-0" onClick={() => move(i, -1)} disabled={i === 0}>
+                      <ArrowUp className="h-3 w-3" />
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-5 w-5 p-0" onClick={() => move(i, 1)} disabled={i === fields.length - 1}>
+                      <ArrowDown className="h-3 w-3" />
+                    </Button>
+                  </div>
+                  <Input
+                    value={f.label_ar}
+                    onChange={(e) => updateField(i, { label_ar: e.target.value })}
+                    onBlur={(e) => { if (!f.key || f.key.startsWith("custom_")) updateField(i, { key: slugifyKey(e.target.value) }); }}
+                    className="h-8 flex-1"
+                    placeholder="اسم الحقل بالعربية"
+                  />
+                  <Select value={f.type} onValueChange={(v: FieldType) => updateField(i, { type: v })}>
+                    <SelectTrigger className="h-8 w-36"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(FIELD_TYPE_LABELS).map(([k, v]) => (
+                        <SelectItem key={k} value={k}>{v}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button size="sm" variant={f.visible === false ? "outline" : "default"} className="h-8"
+                    onClick={() => updateField(i, { visible: !(f.visible !== false) })}>
+                    {f.visible === false ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-8 text-red-600" onClick={() => removeField(i)}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+                <div className="grid grid-cols-2 gap-2 pr-8">
+                  <div>
+                    <Label className="text-xs">المفتاح (مرجع فني)</Label>
+                    <Input value={f.key} onChange={(e) => updateField(i, { key: slugifyKey(e.target.value) })}
+                      className="h-8 font-mono text-xs" />
+                  </div>
+                  <label className="flex items-center gap-2 text-sm mt-6">
+                    <Checkbox checked={!!f.required} onCheckedChange={(c) => updateField(i, { required: !!c })} />
+                    <span>مطلوب</span>
+                  </label>
+                </div>
+                {f.type === "select" && (
+                  <div className="pr-8">
+                    <Label className="text-xs">الخيارات (سطر لكل خيار)</Label>
+                    <Textarea
+                      rows={3}
+                      value={(f.options ?? []).join("\n")}
+                      onChange={(e) => updateField(i, {
+                        options: e.target.value.split("\n").map((s) => s.trim()).filter(Boolean),
+                      })}
+                      placeholder="خيار 1&#10;خيار 2"
+                      className="text-sm"
+                    />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="flex justify-between items-center pt-2">
+          <Button size="sm" variant="outline" onClick={addField}>
+            <Plus className="h-3.5 w-3.5 ml-1" /> إضافة حقل
+          </Button>
+          {dupKey && <span className="text-xs text-red-600">مفتاح مكرر أو فارغ: {dupKey}</span>}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>إلغاء</Button>
+          <Button onClick={() => mut.mutate()} disabled={mut.isPending || !!dupKey}>حفظ التغييرات</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ============================================================
+// PHASE 5 — STATUSES EDITOR
+// ============================================================
+
+type StatusDef = {
+  key: string;
+  label_ar: string;
+  color?: string; // hex or tailwind token
+  order?: number;
+  is_terminal?: boolean;
+  requires_reason?: boolean;
+};
+
+const STATUS_COLOR_PRESETS = [
+  { label: "رمادي", value: "#94a3b8" },
+  { label: "أزرق", value: "#3b82f6" },
+  { label: "بنفسجي", value: "#8b5cf6" },
+  { label: "أخضر", value: "#10b981" },
+  { label: "أصفر", value: "#f59e0b" },
+  { label: "أحمر", value: "#ef4444" },
+];
+
+function StatusesEditorDialog({ template }: { template: any }) {
+  const qc = useQueryClient();
+  const updFn = useServerFn(updateTemplate);
+  const [open, setOpen] = useState(false);
+  const initial: StatusDef[] = Array.isArray(template.statuses_config) ? template.statuses_config : [];
+  const [statuses, setStatuses] = useState<StatusDef[]>(
+    [...initial].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+  );
+
+  const mut = useMutation({
+    mutationFn: () => updFn({ data: { id: template.id, patch: {
+      statuses_config: statuses.map((s, i) => ({ ...s, order: i + 1 })),
+    } } }),
+    onSuccess: () => {
+      toast.success("تم حفظ الحالات");
+      qc.invalidateQueries({ queryKey: ["structure-templates"] });
+      setOpen(false);
+    },
+    onError: (e: any) => toast.error(e.message || "فشل الحفظ"),
+  });
+
+  function addStatus() {
+    const idx = statuses.length + 1;
+    setStatuses((p) => [...p, {
+      key: `status_${idx}`,
+      label_ar: `حالة ${idx}`,
+      color: "#94a3b8",
+      order: idx,
+    }]);
+  }
+  function updateStatus(i: number, patch: Partial<StatusDef>) {
+    setStatuses((p) => p.map((s, idx) => idx === i ? { ...s, ...patch } : s));
+  }
+  function removeStatus(i: number) {
+    setStatuses((p) => p.filter((_, idx) => idx !== i));
+  }
+  function move(i: number, dir: -1 | 1) {
+    const j = i + dir;
+    if (j < 0 || j >= statuses.length) return;
+    setStatuses((p) => {
+      const arr = [...p];
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+      return arr;
+    });
+  }
+  function resetOpen(o: boolean) {
+    setOpen(o);
+    if (o) setStatuses([...initial].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)));
+  }
+
+  const dupKey = (() => {
+    const seen = new Set<string>();
+    for (const s of statuses) {
+      const k = (s.key || "").trim();
+      if (!k) return "empty";
+      if (seen.has(k)) return k;
+      seen.add(k);
+    }
+    return null;
+  })();
+
+  return (
+    <Dialog open={open} onOpenChange={resetOpen}>
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline"><Flag className="h-3.5 w-3.5 ml-1" /> الحالات</Button>
+      </DialogTrigger>
+      <DialogContent dir="rtl" className="max-w-3xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>حالات القالب — {template.name}</DialogTitle>
+        </DialogHeader>
+        <div className="text-xs text-muted-foreground pb-2">
+          هذه الحالات تظهر داخل التاسكات المرتبطة بالقالب. اجعل الحالة "نهائية" عندما لا يجب الخروج منها إلا بصلاحية إدارية.
+        </div>
+        {statuses.length === 0 ? (
+          <div className="text-sm text-muted-foreground text-center py-6">
+            لا توجد حالات مخصّصة. اضغط "إضافة حالة".
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {statuses.map((s, i) => (
+              <div key={i} className="border rounded-md p-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="flex flex-col gap-0.5">
+                    <Button size="sm" variant="ghost" className="h-5 w-5 p-0" onClick={() => move(i, -1)} disabled={i === 0}>
+                      <ArrowUp className="h-3 w-3" />
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-5 w-5 p-0" onClick={() => move(i, 1)} disabled={i === statuses.length - 1}>
+                      <ArrowDown className="h-3 w-3" />
+                    </Button>
+                  </div>
+                  <div className="h-6 w-6 rounded-full border" style={{ background: s.color ?? "#94a3b8" }} />
+                  <Input
+                    value={s.label_ar}
+                    onChange={(e) => updateStatus(i, { label_ar: e.target.value })}
+                    onBlur={(e) => { if (!s.key || s.key.startsWith("status_")) updateStatus(i, { key: slugifyKey(e.target.value) }); }}
+                    className="h-8 flex-1"
+                    placeholder="اسم الحالة"
+                  />
+                  <Select value={s.color ?? "#94a3b8"} onValueChange={(v) => updateStatus(i, { color: v })}>
+                    <SelectTrigger className="h-8 w-32"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {STATUS_COLOR_PRESETS.map((p) => (
+                        <SelectItem key={p.value} value={p.value}>
+                          <span className="flex items-center gap-2">
+                            <span className="h-3 w-3 rounded-full inline-block" style={{ background: p.value }} />
+                            {p.label}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button size="sm" variant="ghost" className="h-8 text-red-600" onClick={() => removeStatus(i)}>
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+                <div className="grid grid-cols-3 gap-2 pr-8 items-center">
+                  <div>
+                    <Label className="text-xs">المفتاح</Label>
+                    <Input value={s.key} onChange={(e) => updateStatus(i, { key: slugifyKey(e.target.value) })}
+                      className="h-8 font-mono text-xs" />
+                  </div>
+                  <label className="flex items-center gap-2 text-sm mt-5">
+                    <Checkbox checked={!!s.is_terminal} onCheckedChange={(c) => updateStatus(i, { is_terminal: !!c })} />
+                    <span>حالة نهائية</span>
+                  </label>
+                  <label className="flex items-center gap-2 text-sm mt-5">
+                    <Checkbox checked={!!s.requires_reason} onCheckedChange={(c) => updateStatus(i, { requires_reason: !!c })} />
+                    <span>تتطلب سببًا</span>
+                  </label>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="flex justify-between items-center pt-2">
+          <Button size="sm" variant="outline" onClick={addStatus}>
+            <Plus className="h-3.5 w-3.5 ml-1" /> إضافة حالة
+          </Button>
+          {dupKey && <span className="text-xs text-red-600">مفتاح مكرر أو فارغ: {dupKey}</span>}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>إلغاء</Button>
+          <Button onClick={() => mut.mutate()} disabled={mut.isPending || !!dupKey}>حفظ التغييرات</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
