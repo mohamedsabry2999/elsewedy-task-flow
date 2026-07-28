@@ -6,20 +6,21 @@ import { myRoles, listNotifications, markNotificationRead, markAllNotificationsR
 import { ROLE_LABEL, MONTHS, type AppRole } from "@/lib/i18n";
 import { useEffect, useRef, useState } from "react";
 import {
-  LayoutDashboard, ListTodo, Calendar, ShieldCheck, History, Settings, LogOut, Bell, Menu, Volume2, VolumeX, CheckCheck,
+  LayoutDashboard, ListTodo, Calendar, ShieldCheck, History, Settings, LogOut, Bell, Menu, Volume2, VolumeX, CheckCheck, ExternalLink, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
+  DropdownMenu, DropdownMenuContent, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { formatDateTime } from "@/lib/format";
 import { isAdminRole } from "@/lib/permissions";
 import { BrandMark } from "@/components/brand/BrandMark";
 import { BrandSplash } from "@/components/brand/BrandSplash";
-import { unlockAudio, playNormal, playSiren } from "@/lib/notification-sound";
+import { playForNotificationOnce, initAudioChannel, isAudioUnlocked, markAudioUnlocked, requestDesktopPermission, currentDesktopPermission } from "@/lib/notification-audio";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
