@@ -457,3 +457,238 @@ function AuditPanel() {
     </Card>
   );
 }
+
+// ============================================================
+// TEMPLATES PANEL
+// ============================================================
+
+function useTemplates() {
+  const listFn = useServerFn(listTemplates);
+  return useQuery({ queryKey: ["structure-templates"], queryFn: () => listFn(), staleTime: 30_000 });
+}
+
+function MonthTemplateSelect({ monthId, currentTemplateId }: { monthId: string; currentTemplateId: string | null }) {
+  const qc = useQueryClient();
+  const { data: templates = [] } = useTemplates();
+  const assignFn = useServerFn(assignTemplateToMonth);
+  const mut = useMutation({
+    mutationFn: (tid: string | null) => assignFn({ data: { month_id: monthId, template_id: tid } }),
+    onSuccess: () => {
+      toast.success("تم تحديث القالب");
+      qc.invalidateQueries({ queryKey: ["structure-months"] });
+      qc.invalidateQueries({ queryKey: ["structure-templates"] });
+    },
+    onError: (e: any) => toast.error(e.message || "تعذّر التحديث"),
+  });
+  return (
+    <div className="flex items-center gap-2 pt-2 border-t border-dashed">
+      <Layers className="h-3.5 w-3.5 text-muted-foreground" />
+      <span className="text-xs text-muted-foreground">القالب:</span>
+      <Select value={currentTemplateId ?? "__none__"} onValueChange={(v) => mut.mutate(v === "__none__" ? null : v)}>
+        <SelectTrigger className="h-8 text-xs flex-1 max-w-[280px]"><SelectValue placeholder="اختر قالبًا" /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__none__">— بدون قالب —</SelectItem>
+          {(templates as any[]).map((t) => (
+            <SelectItem key={t.id} value={t.id}>
+              {t.name} {t.is_system_default ? "★" : ""}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+function TemplatesPanel() {
+  const qc = useQueryClient();
+  const { data: templates = [], isLoading } = useTemplates();
+  const delFn = useServerFn(deleteTemplate);
+  const updFn = useServerFn(updateTemplate);
+  const del = useMutation({
+    mutationFn: (id: string) => delFn({ data: { id } }),
+    onSuccess: () => { toast.success("تم الحذف"); qc.invalidateQueries({ queryKey: ["structure-templates"] }); },
+    onError: (e: any) => toast.error(e.message || "تعذّر الحذف"),
+  });
+  const upd = useMutation({
+    mutationFn: (v: { id: string; patch: Record<string, unknown> }) => updFn({ data: v }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["structure-templates"] }); qc.invalidateQueries({ queryKey: ["structure-months"] }); },
+    onError: (e: any) => toast.error(e.message || "فشل التحديث"),
+  });
+
+  return (
+    <div className="space-y-4">
+      <Card className="card-soft">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-base flex items-center gap-2">
+            <FileStack className="h-4 w-4" /> قوالب المهام
+          </CardTitle>
+          <NewTemplateDialog />
+        </CardHeader>
+        <CardContent>
+          {isLoading && <div className="text-sm text-muted-foreground">جارٍ التحميل…</div>}
+          {!isLoading && templates.length === 0 && (
+            <div className="text-sm text-muted-foreground text-center py-6">لا توجد قوالب بعد.</div>
+          )}
+          <div className="space-y-2">
+            {(templates as any[]).map((t) => (
+              <div key={t.id} className="border rounded-lg p-3 space-y-2">
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <div className="font-semibold">{t.name}</div>
+                      {t.is_system_default && <Badge className="bg-emerald-100 text-emerald-800">افتراضي النظام</Badge>}
+                      <Badge variant="outline">{t.months_using} شهر يستخدمه</Badge>
+                      {t.cloned_from_id && <Badge variant="outline"><Copy className="h-3 w-3 ml-1" /> مُستنسخ</Badge>}
+                    </div>
+                    {t.description && <div className="text-xs text-muted-foreground mt-1">{t.description}</div>}
+                  </div>
+                  <div className="flex gap-1">
+                    <EditTemplateDialog template={t} />
+                    <Button size="sm" variant="outline"
+                      onClick={() => upd.mutate({ id: t.id, patch: { is_system_default: true } })}
+                      disabled={t.is_system_default}>
+                      <Star className="h-3.5 w-3.5" />
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button size="sm" variant="ghost" className="text-red-600" disabled={t.is_system_default || t.months_using > 0}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>حذف القالب "{t.name}"؟</AlertDialogTitle>
+                          <AlertDialogDescription>هذا الإجراء لا يمكن التراجع عنه.</AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                          <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={() => del.mutate(t.id)}>حذف</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+      <div className="text-xs text-muted-foreground px-2">
+        ملاحظة: بنية القوالب (أعمدة/حقول/حالات) سيتم توسيعها في المراحل القادمة. حاليًا يُستخدم القالب كوعاء للاسم والوصف والربط مع الشهور.
+      </div>
+    </div>
+  );
+}
+
+function NewTemplateDialog() {
+  const qc = useQueryClient();
+  const createFn = useServerFn(createTemplate);
+  const { data: templates = [] } = useTemplates();
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [cloneFrom, setCloneFrom] = useState<string>("__default__");
+  const [makeDefault, setMakeDefault] = useState(false);
+
+  const mut = useMutation({
+    mutationFn: () => createFn({ data: {
+      name: name.trim(),
+      description: description.trim() || null,
+      clone_from_id: cloneFrom === "__scratch__" ? null : (cloneFrom === "__default__" ? null : cloneFrom),
+      is_system_default: makeDefault,
+    } }),
+    onSuccess: () => {
+      toast.success("تم إنشاء القالب");
+      qc.invalidateQueries({ queryKey: ["structure-templates"] });
+      setOpen(false); setName(""); setDescription(""); setCloneFrom("__default__"); setMakeDefault(false);
+    },
+    onError: (e: any) => toast.error(e.message || "تعذّر الإنشاء"),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button size="sm"><Plus className="h-4 w-4 ml-1" /> قالب جديد</Button>
+      </DialogTrigger>
+      <DialogContent dir="rtl">
+        <DialogHeader><DialogTitle>إنشاء قالب جديد</DialogTitle></DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <Label>الاسم *</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="مثال: قالب أعمال أوفست" />
+          </div>
+          <div>
+            <Label>الوصف</Label>
+            <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} />
+          </div>
+          <div>
+            <Label>المصدر</Label>
+            <Select value={cloneFrom} onValueChange={setCloneFrom}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__default__">نسخ من الافتراضي</SelectItem>
+                <SelectItem value="__scratch__">قالب فارغ من الصفر</SelectItem>
+                {(templates as any[]).map((t) => (
+                  <SelectItem key={t.id} value={t.id}>نسخ من: {t.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <label className="flex items-center gap-2 text-sm">
+            <Checkbox checked={makeDefault} onCheckedChange={(c) => setMakeDefault(!!c)} />
+            <span>جعل هذا القالب افتراضيًا للنظام</span>
+          </label>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>إلغاء</Button>
+          <Button onClick={() => mut.mutate()} disabled={!name.trim() || mut.isPending}>إنشاء</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function EditTemplateDialog({ template }: { template: any }) {
+  const qc = useQueryClient();
+  const updFn = useServerFn(updateTemplate);
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState(template.name);
+  const [description, setDescription] = useState(template.description ?? "");
+
+  const mut = useMutation({
+    mutationFn: () => updFn({ data: { id: template.id, patch: {
+      name: name.trim(), description: description.trim() || null,
+    } } }),
+    onSuccess: () => {
+      toast.success("تم الحفظ");
+      qc.invalidateQueries({ queryKey: ["structure-templates"] });
+      setOpen(false);
+    },
+    onError: (e: any) => toast.error(e.message || "فشل الحفظ"),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline">تحرير</Button>
+      </DialogTrigger>
+      <DialogContent dir="rtl">
+        <DialogHeader><DialogTitle>تحرير القالب</DialogTitle></DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <Label>الاسم</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div>
+            <Label>الوصف</Label>
+            <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>إلغاء</Button>
+          <Button onClick={() => mut.mutate()} disabled={!name.trim() || mut.isPending}>حفظ</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
