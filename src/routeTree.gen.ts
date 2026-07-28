@@ -13,6 +13,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedTeamRouteImport } from './routes/_authenticated/team'
+import { Route as AuthenticatedStructureRouteImport } from './routes/_authenticated/structure'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedActivityRouteImport } from './routes/_authenticated/activity'
@@ -38,6 +39,11 @@ const IndexRoute = IndexRouteImport.update({
 const AuthenticatedTeamRoute = AuthenticatedTeamRouteImport.update({
   id: '/team',
   path: '/team',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedStructureRoute = AuthenticatedStructureRouteImport.update({
+  id: '/structure',
+  path: '/structure',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
@@ -84,6 +90,7 @@ export interface FileRoutesByFullPath {
   '/activity': typeof AuthenticatedActivityRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/structure': typeof AuthenticatedStructureRoute
   '/team': typeof AuthenticatedTeamRoute
   '/months/$month': typeof AuthenticatedMonthsMonthRoute
   '/tasks/new': typeof AuthenticatedTasksNewRoute
@@ -96,6 +103,7 @@ export interface FileRoutesByTo {
   '/activity': typeof AuthenticatedActivityRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/structure': typeof AuthenticatedStructureRoute
   '/team': typeof AuthenticatedTeamRoute
   '/months/$month': typeof AuthenticatedMonthsMonthRoute
   '/tasks/new': typeof AuthenticatedTasksNewRoute
@@ -110,6 +118,7 @@ export interface FileRoutesById {
   '/_authenticated/activity': typeof AuthenticatedActivityRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/_authenticated/structure': typeof AuthenticatedStructureRoute
   '/_authenticated/team': typeof AuthenticatedTeamRoute
   '/_authenticated/months/$month': typeof AuthenticatedMonthsMonthRoute
   '/_authenticated/tasks/new': typeof AuthenticatedTasksNewRoute
@@ -124,6 +133,7 @@ export interface FileRouteTypes {
     | '/activity'
     | '/dashboard'
     | '/settings'
+    | '/structure'
     | '/team'
     | '/months/$month'
     | '/tasks/new'
@@ -136,6 +146,7 @@ export interface FileRouteTypes {
     | '/activity'
     | '/dashboard'
     | '/settings'
+    | '/structure'
     | '/team'
     | '/months/$month'
     | '/tasks/new'
@@ -149,6 +160,7 @@ export interface FileRouteTypes {
     | '/_authenticated/activity'
     | '/_authenticated/dashboard'
     | '/_authenticated/settings'
+    | '/_authenticated/structure'
     | '/_authenticated/team'
     | '/_authenticated/months/$month'
     | '/_authenticated/tasks/new'
@@ -191,6 +203,13 @@ declare module '@tanstack/react-router' {
       path: '/team'
       fullPath: '/team'
       preLoaderRoute: typeof AuthenticatedTeamRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/structure': {
+      id: '/_authenticated/structure'
+      path: '/structure'
+      fullPath: '/structure'
+      preLoaderRoute: typeof AuthenticatedStructureRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/settings': {
@@ -249,6 +268,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedActivityRoute: typeof AuthenticatedActivityRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+  AuthenticatedStructureRoute: typeof AuthenticatedStructureRoute
   AuthenticatedTeamRoute: typeof AuthenticatedTeamRoute
   AuthenticatedMonthsMonthRoute: typeof AuthenticatedMonthsMonthRoute
   AuthenticatedTasksNewRoute: typeof AuthenticatedTasksNewRoute
@@ -259,6 +279,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedActivityRoute: AuthenticatedActivityRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
+  AuthenticatedStructureRoute: AuthenticatedStructureRoute,
   AuthenticatedTeamRoute: AuthenticatedTeamRoute,
   AuthenticatedMonthsMonthRoute: AuthenticatedMonthsMonthRoute,
   AuthenticatedTasksNewRoute: AuthenticatedTasksNewRoute,
