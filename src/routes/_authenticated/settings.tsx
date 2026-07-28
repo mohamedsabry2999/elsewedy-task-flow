@@ -8,9 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useEffect, useState } from "react";
 import { playNormal, playSiren, unlockAudio } from "@/lib/notification-sound";
+import { requestDesktopPermission, currentDesktopPermission } from "@/lib/notification-audio";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 export const Route = createFileRoute("/_authenticated/settings")({
@@ -30,18 +32,29 @@ function SettingsPage() {
   const [soundsEnabled, setSoundsEnabled] = useState(true);
   const [volNormal, setVolNormal] = useState(60);
   const [volUrgent, setVolUrgent] = useState(90);
+  const [desktopEnabled, setDesktopEnabled] = useState(false);
+  const [quietStart, setQuietStart] = useState<string>("");
+  const [quietEnd, setQuietEnd] = useState<string>("");
+  const [desktopPerm, setDesktopPerm] = useState<string>("default");
 
+  useEffect(() => { setDesktopPerm(currentDesktopPermission()); }, []);
   useEffect(() => {
     if (!prefs) return;
     setSoundsEnabled(prefs.sounds_enabled !== false);
     setVolNormal(prefs.volume_normal ?? 60);
     setVolUrgent(prefs.volume_urgent ?? 90);
+    setDesktopEnabled(!!(prefs as any).desktop_enabled);
+    setQuietStart((prefs as any).quiet_hours_start != null ? String((prefs as any).quiet_hours_start) : "");
+    setQuietEnd((prefs as any).quiet_hours_end != null ? String((prefs as any).quiet_hours_end) : "");
   }, [prefs]);
 
   const save = useMutation({
     mutationFn: () => savePrefsFn({ data: {
       sounds_enabled: soundsEnabled, volume_normal: volNormal, volume_urgent: volUrgent,
-    }}),
+      desktop_enabled: desktopEnabled,
+      quiet_hours_start: quietStart === "" ? null : Number(quietStart),
+      quiet_hours_end: quietEnd === "" ? null : Number(quietEnd),
+    } as any }),
     onSuccess: () => { toast.success("تم حفظ التفضيلات"); qc.invalidateQueries({ queryKey: ["notif-prefs"] }); },
     onError: (e: any) => toast.error(e.message),
   });
