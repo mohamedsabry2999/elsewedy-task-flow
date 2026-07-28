@@ -3,11 +3,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { myRoles, listNotifications, markNotificationRead, markAllNotificationsRead, getNotificationPrefs } from "@/lib/tasks.functions";
+import { listNavMonths, canManageStructure } from "@/lib/structure.functions";
 import { ROLE_LABEL, MONTHS, type AppRole } from "@/lib/i18n";
 import { useEffect, useRef, useState } from "react";
 import {
-  LayoutDashboard, ListTodo, Calendar, ShieldCheck, History, Settings, LogOut, Bell, Menu, Volume2, VolumeX, CheckCheck, ExternalLink, X,
+  LayoutDashboard, ListTodo, Calendar, ShieldCheck, History, Settings, LogOut, Bell, Menu, Volume2, VolumeX, CheckCheck, ExternalLink, X, SlidersHorizontal,
 } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuLabel,
