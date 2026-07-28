@@ -34,17 +34,9 @@ export const Route = createFileRoute("/api/public/hooks/overdue-scan")({
     handlers: {
       GET: async () => new Response("Method Not Allowed", { status: 405 }),
       POST: async ({ request }) => {
-        // Auth: Bearer OVERDUE_SCAN_SECRET
-        const expected = process.env.OVERDUE_SCAN_SECRET;
-        if (!expected) {
-          console.warn("[overdue-scan] missing OVERDUE_SCAN_SECRET env");
-          return new Response(JSON.stringify({ error: "unauthorized" }), {
-            status: 401, headers: { "Content-Type": "application/json" },
-          });
-        }
         const auth = request.headers.get("authorization") || "";
         const token = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
-        if (!token || !safeEqual(token, expected)) {
+        if (!token || token.length < 16) {
           return new Response(JSON.stringify({ error: "unauthorized" }), {
             status: 401, headers: { "Content-Type": "application/json" },
           });
@@ -62,6 +54,14 @@ export const Route = createFileRoute("/api/public/hooks/overdue-scan")({
 
         try {
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+          // Verify token against Vault via RPC (constant-time in SQL)
+          const { data: verified, error: vErr } = await supabaseAdmin
+            .rpc("verify_overdue_scan_secret", { _token: token });
+          if (vErr || verified !== true) {
+            return new Response(JSON.stringify({ error: "unauthorized" }), {
+              status: 401, headers: { "Content-Type": "application/json" },
+            });
+          }
           const nowMs = Date.now();
           const nowIso = new Date(nowMs).toISOString();
 
