@@ -14,12 +14,52 @@ export type Database = {
   }
   public: {
     Tables: {
+      notification_preferences: {
+        Row: {
+          created_at: string
+          event_toggles: Json
+          quiet_hours_end: number | null
+          quiet_hours_start: number | null
+          sounds_enabled: boolean
+          updated_at: string
+          user_id: string
+          volume_normal: number
+          volume_urgent: number
+        }
+        Insert: {
+          created_at?: string
+          event_toggles?: Json
+          quiet_hours_end?: number | null
+          quiet_hours_start?: number | null
+          sounds_enabled?: boolean
+          updated_at?: string
+          user_id: string
+          volume_normal?: number
+          volume_urgent?: number
+        }
+        Update: {
+          created_at?: string
+          event_toggles?: Json
+          quiet_hours_end?: number | null
+          quiet_hours_start?: number | null
+          sounds_enabled?: boolean
+          updated_at?: string
+          user_id?: string
+          volume_normal?: number
+          volume_urgent?: number
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           body: string | null
           created_at: string
+          data: Json
           id: string
           is_read: boolean
+          kind: string
+          played_at: string | null
+          severity: string
           task_id: string | null
           title: string
           user_id: string
@@ -27,8 +67,12 @@ export type Database = {
         Insert: {
           body?: string | null
           created_at?: string
+          data?: Json
           id?: string
           is_read?: boolean
+          kind?: string
+          played_at?: string | null
+          severity?: string
           task_id?: string | null
           title: string
           user_id: string
@@ -36,8 +80,12 @@ export type Database = {
         Update: {
           body?: string | null
           created_at?: string
+          data?: Json
           id?: string
           is_read?: boolean
+          kind?: string
+          played_at?: string | null
+          severity?: string
           task_id?: string | null
           title?: string
           user_id?: string
@@ -45,6 +93,38 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "notifications_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      overdue_events: {
+        Row: {
+          id: string
+          sent_at: string
+          stage: string
+          task_id: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          sent_at?: string
+          stage: string
+          task_id: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          sent_at?: string
+          stage?: string
+          task_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "overdue_events_task_id_fkey"
             columns: ["task_id"]
             isOneToOne: false
             referencedRelation: "tasks"
@@ -249,6 +329,7 @@ export type Database = {
           design_status: Database["public"]["Enums"]["design_status"]
           designer_id: string | null
           designer_notes: string | null
+          due_at: string | null
           files_url: string | null
           final_version_url: string | null
           id: string
@@ -283,6 +364,7 @@ export type Database = {
           design_status?: Database["public"]["Enums"]["design_status"]
           designer_id?: string | null
           designer_notes?: string | null
+          due_at?: string | null
           files_url?: string | null
           final_version_url?: string | null
           id?: string
@@ -317,6 +399,7 @@ export type Database = {
           design_status?: Database["public"]["Enums"]["design_status"]
           designer_id?: string | null
           designer_notes?: string | null
+          due_at?: string | null
           files_url?: string | null
           final_version_url?: string | null
           id?: string
