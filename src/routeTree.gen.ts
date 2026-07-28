@@ -19,6 +19,7 @@ import { Route as AuthenticatedActivityRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedTasksIndexRouteImport } from './routes/_authenticated/tasks.index'
 import { Route as AuthenticatedTasksNewRouteImport } from './routes/_authenticated/tasks.new'
 import { Route as AuthenticatedMonthsMonthRouteImport } from './routes/_authenticated/months.$month'
+import { Route as ApiPublicHooksOverdueScanRouteImport } from './routes/api/public/hooks/overdue-scan'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -70,6 +71,12 @@ const AuthenticatedMonthsMonthRoute =
     path: '/months/$month',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const ApiPublicHooksOverdueScanRoute =
+  ApiPublicHooksOverdueScanRouteImport.update({
+    id: '/api/public/hooks/overdue-scan',
+    path: '/api/public/hooks/overdue-scan',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -81,6 +88,7 @@ export interface FileRoutesByFullPath {
   '/months/$month': typeof AuthenticatedMonthsMonthRoute
   '/tasks/new': typeof AuthenticatedTasksNewRoute
   '/tasks/': typeof AuthenticatedTasksIndexRoute
+  '/api/public/hooks/overdue-scan': typeof ApiPublicHooksOverdueScanRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -92,6 +100,7 @@ export interface FileRoutesByTo {
   '/months/$month': typeof AuthenticatedMonthsMonthRoute
   '/tasks/new': typeof AuthenticatedTasksNewRoute
   '/tasks': typeof AuthenticatedTasksIndexRoute
+  '/api/public/hooks/overdue-scan': typeof ApiPublicHooksOverdueScanRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -105,6 +114,7 @@ export interface FileRoutesById {
   '/_authenticated/months/$month': typeof AuthenticatedMonthsMonthRoute
   '/_authenticated/tasks/new': typeof AuthenticatedTasksNewRoute
   '/_authenticated/tasks/': typeof AuthenticatedTasksIndexRoute
+  '/api/public/hooks/overdue-scan': typeof ApiPublicHooksOverdueScanRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -118,6 +128,7 @@ export interface FileRouteTypes {
     | '/months/$month'
     | '/tasks/new'
     | '/tasks/'
+    | '/api/public/hooks/overdue-scan'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -129,6 +140,7 @@ export interface FileRouteTypes {
     | '/months/$month'
     | '/tasks/new'
     | '/tasks'
+    | '/api/public/hooks/overdue-scan'
   id:
     | '__root__'
     | '/'
@@ -141,12 +153,14 @@ export interface FileRouteTypes {
     | '/_authenticated/months/$month'
     | '/_authenticated/tasks/new'
     | '/_authenticated/tasks/'
+    | '/api/public/hooks/overdue-scan'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  ApiPublicHooksOverdueScanRoute: typeof ApiPublicHooksOverdueScanRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -221,6 +235,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMonthsMonthRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/public/hooks/overdue-scan': {
+      id: '/api/public/hooks/overdue-scan'
+      path: '/api/public/hooks/overdue-scan'
+      fullPath: '/api/public/hooks/overdue-scan'
+      preLoaderRoute: typeof ApiPublicHooksOverdueScanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -251,6 +272,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  ApiPublicHooksOverdueScanRoute: ApiPublicHooksOverdueScanRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
