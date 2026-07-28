@@ -489,6 +489,7 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      verify_overdue_scan_secret: { Args: { _token: string }; Returns: boolean }
     }
     Enums: {
       app_role:
