@@ -396,9 +396,24 @@ function DesignTab({ task, profiles, canEdit }: { task: any; profiles: any[]; ca
           <Input type="date" defaultValue={task.design_start_date ?? ""} disabled={!canEdit("design_start_date")}
             onBlur={(e) => patch({ design_start_date: e.target.value || null })} />
         </FieldRow>
-        <FieldRow label="موعد التسليم" locked={!canEdit("delivery_due_date")}>
+        <FieldRow label="تاريخ التسليم" locked={!canEdit("delivery_due_date")}>
           <Input type="date" defaultValue={task.delivery_due_date ?? ""} disabled={!canEdit("delivery_due_date")}
             onBlur={(e) => patch({ delivery_due_date: e.target.value || null })} />
+        </FieldRow>
+        <FieldRow label="وقت التسليم" locked={!canEdit("delivery_due_date")}>
+          <Input type="time" defaultValue={task.delivery_due_time ?? ""} disabled={!canEdit("delivery_due_date")}
+            onBlur={(e) => patch({ delivery_due_time: e.target.value || null })} />
+        </FieldRow>
+      </div>
+      <div className="grid grid-cols-1 gap-3">
+        <FieldRow label="سبب الإيقاف (لو الحالة متوقف)">
+          <Textarea defaultValue={task.stop_reason ?? ""} onBlur={(e) => patch({ stop_reason: e.target.value || null })} />
+        </FieldRow>
+        <FieldRow label="ملاحظة التعديل (لو الحالة تعديلات)">
+          <Textarea defaultValue={task.revision_note ?? ""} onBlur={(e) => patch({ revision_note: e.target.value || null })} />
+        </FieldRow>
+        <FieldRow label="سبب إعادة الفتح (عند إعادة فتح مكتمل)">
+          <Textarea defaultValue={task.reopen_note ?? ""} onBlur={(e) => patch({ reopen_note: e.target.value || null })} />
         </FieldRow>
       </div>
       <FieldRow label="رابط الملفات" locked={!canEdit("files_url")}>
