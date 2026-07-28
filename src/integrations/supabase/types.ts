@@ -28,6 +28,7 @@ export type Database = {
           month_num: number
           name_ar: string
           slug: string | null
+          template_id: string | null
           updated_at: string
           verse: string | null
           verse_ref: string | null
@@ -46,6 +47,7 @@ export type Database = {
           month_num: number
           name_ar: string
           slug?: string | null
+          template_id?: string | null
           updated_at?: string
           verse?: string | null
           verse_ref?: string | null
@@ -64,12 +66,20 @@ export type Database = {
           month_num?: number
           name_ar?: string
           slug?: string | null
+          template_id?: string | null
           updated_at?: string
           verse?: string | null
           verse_ref?: string | null
           year_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "months_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "task_templates"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "months_year_id_fkey"
             columns: ["year_id"]
@@ -417,6 +427,56 @@ export type Database = {
           },
         ]
       }
+      task_templates: {
+        Row: {
+          cloned_from_id: string | null
+          columns_config: Json
+          created_at: string
+          created_by: string | null
+          description: string | null
+          fields_config: Json
+          id: string
+          is_system_default: boolean
+          name: string
+          statuses_config: Json
+          updated_at: string
+        }
+        Insert: {
+          cloned_from_id?: string | null
+          columns_config?: Json
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          fields_config?: Json
+          id?: string
+          is_system_default?: boolean
+          name: string
+          statuses_config?: Json
+          updated_at?: string
+        }
+        Update: {
+          cloned_from_id?: string | null
+          columns_config?: Json
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          fields_config?: Json
+          id?: string
+          is_system_default?: boolean
+          name?: string
+          statuses_config?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_templates_cloned_from_id_fkey"
+            columns: ["cloned_from_id"]
+            isOneToOne: false
+            referencedRelation: "task_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tasks: {
         Row: {
           actual_delivery_date: string | null
@@ -641,6 +701,10 @@ export type Database = {
       can_view_task: {
         Args: { _task_id: string; _user_id: string }
         Returns: boolean
+      }
+      clone_task_template: {
+        Args: { _actor: string; _name: string; _source_id: string }
+        Returns: string
       }
       has_any_role: {
         Args: {

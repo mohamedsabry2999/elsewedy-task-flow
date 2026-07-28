@@ -334,3 +334,148 @@ export const canManageStructure = createServerFn({ method: "GET" })
     if (error) return false;
     return data === true;
   });
+
+// ============================================================
+// PHASE 2: TASK TEMPLATES
+// ============================================================
+
+export const listTemplates = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data: tpls, error } = await context.supabase
+      .from("task_templates").select("*")
+      .order("is_system_default", { ascending: false })
+      .order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
+    // Count how many months use each template.
+    const ids = (tpls ?? []).map((t: any) => t.id);
+    const usage = new Map<string, number>();
+    if (ids.length > 0) {
+      const { data: months } = await context.supabase
+        .from("months").select("template_id").in("template_id", ids);
+      (months ?? []).forEach((m: any) => {
+        if (m.template_id) usage.set(m.template_id, (usage.get(m.template_id) ?? 0) + 1);
+      });
+    }
+    return (tpls ?? []).map((t: any) => ({ ...t, months_using: usage.get(t.id) ?? 0 }));
+  });
+
+export const getTemplate = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string }) => d)
+  .handler(async ({ data, context }) => {
+    const { data: t, error } = await context.supabase
+      .from("task_templates").select("*").eq("id", data.id).maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!t) throw new Error("القالب غير موجود");
+    return t;
+  });
+
+export const createTemplate = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: {
+    name: string; description?: string | null;
+    clone_from_id?: string | null;
+    is_system_default?: boolean;
+  }) => d)
+  .handler(async ({ data, context }) => {
+    await assertCanManage(context);
+    const name = (data.name ?? "").trim();
+    if (!name) throw new Error("الاسم مطلوب");
+
+    let newId: string;
+    if (data.clone_from_id) {
+      const { data: cid, error } = await context.supabase
+        .rpc("clone_task_template", {
+          _source_id: data.clone_from_id, _name: name, _actor: context.userId,
+        });
+      if (error) throw new Error(error.message);
+      newId = cid as string;
+      if (data.description !== undefined) {
+        await context.supabase.from("task_templates")
+          .update({ description: data.description }).eq("id", newId);
+      }
+    } else {
+      const { data: t, error } = await context.supabase
+        .from("task_templates").insert({
+          name, description: data.description ?? null,
+          created_by: context.userId,
+        } as any).select().single();
+      if (error) throw new Error(error.message);
+      newId = t.id;
+    }
+
+    if (data.is_system_default) {
+      await context.supabase.from("task_templates")
+        .update({ is_system_default: true }).eq("id", newId);
+    }
+
+    const { data: final } = await context.supabase
+      .from("task_templates").select("*").eq("id", newId).single();
+    await logAudit(context, "create", "template", newId, null, final, {
+      cloned_from_id: data.clone_from_id ?? null,
+    });
+    return final;
+  });
+
+export const updateTemplate = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: {
+    id: string;
+    patch: {
+      name?: string; description?: string | null;
+      is_system_default?: boolean;
+      columns_config?: unknown; fields_config?: unknown; statuses_config?: unknown;
+    };
+  }) => d)
+  .handler(async ({ data, context }) => {
+    await assertCanManage(context);
+    const forbid = ["id", "cloned_from_id", "created_at", "created_by"];
+    for (const k of forbid) if (k in (data.patch as any)) delete (data.patch as any)[k];
+    const { data: before } = await context.supabase
+      .from("task_templates").select("*").eq("id", data.id).maybeSingle();
+    const { data: after, error } = await context.supabase
+      .from("task_templates").update(data.patch as any).eq("id", data.id)
+      .select().single();
+    if (error) throw new Error(error.message);
+    await logAudit(context, "update", "template", data.id, before, after);
+    return after;
+  });
+
+export const deleteTemplate = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string }) => d)
+  .handler(async ({ data, context }) => {
+    await assertCanManage(context);
+    const { data: before } = await context.supabase
+      .from("task_templates").select("*").eq("id", data.id).maybeSingle();
+    if (before?.is_system_default) {
+      throw new Error("لا يمكن حذف القالب الافتراضي للنظام");
+    }
+    // Detach months first (SET NULL happens automatically via FK, but count check for UX).
+    const { count } = await context.supabase.from("months")
+      .select("id", { count: "exact", head: true }).eq("template_id", data.id);
+    if ((count ?? 0) > 0) {
+      throw new Error(`لا يمكن حذف القالب لأن ${count} شهر يستخدمه. غيّر قالب هذه الشهور أولًا.`);
+    }
+    const { error } = await context.supabase.from("task_templates").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+    await logAudit(context, "delete", "template", data.id, before, null);
+    return { ok: true };
+  });
+
+// Attach an existing template to a month (replaces any existing link).
+export const assignTemplateToMonth = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { month_id: string; template_id: string | null }) => d)
+  .handler(async ({ data, context }) => {
+    await assertCanManage(context);
+    const { data: before } = await context.supabase
+      .from("months").select("id, template_id, name_ar").eq("id", data.month_id).maybeSingle();
+    const { data: after, error } = await context.supabase
+      .from("months").update({ template_id: data.template_id } as any)
+      .eq("id", data.month_id).select().single();
+    if (error) throw new Error(error.message);
+    await logAudit(context, "assign_template", "month", data.month_id, before, after);
+    return after;
+  });
