@@ -219,7 +219,7 @@ function TeamPage() {
                         <TableCell>{u.department || "—"}</TableCell>
                         <TableCell>{u.job_title || "—"}</TableCell>
                         <TableCell>
-                          {(u.roles ?? []).map((r) => (
+                          {(u.roles ?? []).map((r: string) => (
                             <Badge key={r} variant="secondary" className="ml-1">{ROLE_LABEL[r as AppRole] ?? r}</Badge>
                           ))}
                         </TableCell>
@@ -336,7 +336,7 @@ function RowActions({ user, isSuper, onDetail, onPerms }:
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-56" dir="rtl">
+        <DropdownMenuContent align="start" className="w-56">
           <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
           <DropdownMenuItem onClick={onDetail}><Eye className="h-4 w-4 ml-2" /> عرض / تعديل البيانات</DropdownMenuItem>
           <DropdownMenuSeparator />
