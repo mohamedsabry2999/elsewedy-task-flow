@@ -8,9 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useEffect, useState } from "react";
 import { playNormal, playSiren, unlockAudio } from "@/lib/notification-sound";
+import { requestDesktopPermission, currentDesktopPermission } from "@/lib/notification-audio";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 export const Route = createFileRoute("/_authenticated/settings")({
@@ -30,18 +32,29 @@ function SettingsPage() {
   const [soundsEnabled, setSoundsEnabled] = useState(true);
   const [volNormal, setVolNormal] = useState(60);
   const [volUrgent, setVolUrgent] = useState(90);
+  const [desktopEnabled, setDesktopEnabled] = useState(false);
+  const [quietStart, setQuietStart] = useState<string>("");
+  const [quietEnd, setQuietEnd] = useState<string>("");
+  const [desktopPerm, setDesktopPerm] = useState<string>("default");
 
+  useEffect(() => { setDesktopPerm(currentDesktopPermission()); }, []);
   useEffect(() => {
     if (!prefs) return;
     setSoundsEnabled(prefs.sounds_enabled !== false);
     setVolNormal(prefs.volume_normal ?? 60);
     setVolUrgent(prefs.volume_urgent ?? 90);
+    setDesktopEnabled(!!(prefs as any).desktop_enabled);
+    setQuietStart((prefs as any).quiet_hours_start != null ? String((prefs as any).quiet_hours_start) : "");
+    setQuietEnd((prefs as any).quiet_hours_end != null ? String((prefs as any).quiet_hours_end) : "");
   }, [prefs]);
 
   const save = useMutation({
     mutationFn: () => savePrefsFn({ data: {
       sounds_enabled: soundsEnabled, volume_normal: volNormal, volume_urgent: volUrgent,
-    }}),
+      desktop_enabled: desktopEnabled,
+      quiet_hours_start: quietStart === "" ? null : Number(quietStart),
+      quiet_hours_end: quietEnd === "" ? null : Number(quietEnd),
+    } as any }),
     onSuccess: () => { toast.success("تم حفظ التفضيلات"); qc.invalidateQueries({ queryKey: ["notif-prefs"] }); },
     onError: (e: any) => toast.error(e.message),
   });
@@ -85,6 +98,41 @@ function SettingsPage() {
               تجربة الصفارة
             </Button>
           </div>
+
+          <div className="border-t pt-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>إشعارات سطح المكتب</Label>
+                <p className="text-xs text-muted-foreground">
+                  الحالة: {desktopPerm === "granted" ? "مسموح" : desktopPerm === "denied" ? "مرفوض من المتصفح" : desktopPerm === "unsupported" ? "غير مدعوم" : "لم يُطلب بعد"}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {desktopPerm !== "granted" && desktopPerm !== "unsupported" && (
+                  <Button size="sm" variant="outline" onClick={async () => {
+                    const p = await requestDesktopPermission(); setDesktopPerm(p);
+                    if (p === "granted") setDesktopEnabled(true);
+                  }}>طلب الإذن</Button>
+                )}
+                <Switch checked={desktopEnabled} disabled={desktopPerm !== "granted"} onCheckedChange={setDesktopEnabled} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">ساعة بدء الوضع الهادئ (0-23)</Label>
+                <Input type="number" min={0} max={23} value={quietStart} onChange={(e) => setQuietStart(e.target.value)} placeholder="—" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">ساعة انتهاء الوضع الهادئ (0-23)</Label>
+                <Input type="number" min={0} max={23} value={quietEnd} onChange={(e) => setQuietEnd(e.target.value)} placeholder="—" />
+              </div>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              خلال الساعات الهادئة يتم إسكات الأصوات وإشعارات سطح المكتب (يستثنى العاجل).
+            </p>
+          </div>
+
           <Button onClick={() => save.mutate()} disabled={save.isPending}>حفظ التفضيلات</Button>
         </CardContent>
       </Card>
