@@ -296,3 +296,91 @@ export const myRoles = createServerFn({ method: "GET" })
     const { data } = await context.supabase.from("user_roles").select("role").eq("user_id", context.userId);
     return (data ?? []).map((r) => r.role as string);
   });
+
+// ============ Phase D: Files ============
+export const listTaskFiles = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { task_id: string }) => d)
+  .handler(async ({ data, context }) => {
+    const { data: rows, error } = await context.supabase
+      .from("task_attachments").select("*")
+      .eq("task_id", data.task_id).order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
+    return rows ?? [];
+  });
+
+export const recordTaskFile = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: {
+    task_id: string; file_name: string; file_url: string;
+    kind?: string; file_size?: number | null; mime_type?: string | null;
+  }) => d)
+  .handler(async ({ data, context }) => {
+    const { data: row, error } = await context.supabase
+      .from("task_attachments").insert({
+        task_id: data.task_id,
+        uploader_id: context.userId,
+        file_name: data.file_name,
+        file_url: data.file_url,
+        kind: data.kind ?? "reference",
+        file_size: data.file_size ?? null,
+        mime_type: data.mime_type ?? null,
+      } as any).select().single();
+    if (error) throw new Error(error.message);
+    return row;
+  });
+
+export const signTaskFileUrl = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { path: string; expires?: number }) => d)
+  .handler(async ({ data, context }) => {
+    const { data: r, error } = await context.supabase.storage
+      .from("task-files").createSignedUrl(data.path, data.expires ?? 300);
+    if (error) throw new Error(error.message);
+    return r;
+  });
+
+export const deleteTaskFile = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { attachment_id: string; path: string }) => d)
+  .handler(async ({ data, context }) => {
+    await context.supabase.storage.from("task-files").remove([data.path]);
+    const { error } = await context.supabase.from("task_attachments").delete().eq("id", data.attachment_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+// ============ Phase F: Notification prefs + bulk mark ============
+export const getNotificationPrefs = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data } = await context.supabase
+      .from("notification_preferences").select("*").eq("user_id", context.userId).maybeSingle();
+    return data ?? {
+      user_id: context.userId,
+      sounds_enabled: true, volume_normal: 60, volume_urgent: 90,
+      quiet_hours_start: null, quiet_hours_end: null, event_toggles: {},
+    };
+  });
+
+export const saveNotificationPrefs = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: {
+    sounds_enabled?: boolean; volume_normal?: number; volume_urgent?: number;
+    quiet_hours_start?: number | null; quiet_hours_end?: number | null;
+    event_toggles?: Record<string, boolean>;
+  }) => d)
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase.from("notification_preferences")
+      .upsert({ user_id: context.userId, ...data } as any, { onConflict: "user_id" });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const markAllNotificationsRead = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await context.supabase.from("notifications").update({ is_read: true })
+      .eq("user_id", context.userId).eq("is_read", false);
+    return { ok: true };
+  });
