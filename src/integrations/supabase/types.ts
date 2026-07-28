@@ -323,6 +323,7 @@ export type Database = {
           deleted_at: string | null
           delivered: boolean
           delivery_due_date: string | null
+          delivery_due_time: string | null
           design_brief: string | null
           design_checklist: Json
           design_start_date: string | null
@@ -340,11 +341,14 @@ export type Database = {
           overall_status: Database["public"]["Enums"]["overall_status"]
           priority: Database["public"]["Enums"]["priority"]
           products: Database["public"]["Enums"]["product_service"][]
+          reopen_note: string | null
           request_date: string | null
+          revision_note: string | null
           sales_checklist: Json
           sales_client_revisions: string | null
           sales_owner_id: string | null
           size_qty_material: string | null
+          stop_reason: string | null
           task_code: string | null
           task_name: string
           updated_at: string
@@ -358,6 +362,7 @@ export type Database = {
           deleted_at?: string | null
           delivered?: boolean
           delivery_due_date?: string | null
+          delivery_due_time?: string | null
           design_brief?: string | null
           design_checklist?: Json
           design_start_date?: string | null
@@ -375,11 +380,14 @@ export type Database = {
           overall_status?: Database["public"]["Enums"]["overall_status"]
           priority?: Database["public"]["Enums"]["priority"]
           products?: Database["public"]["Enums"]["product_service"][]
+          reopen_note?: string | null
           request_date?: string | null
+          revision_note?: string | null
           sales_checklist?: Json
           sales_client_revisions?: string | null
           sales_owner_id?: string | null
           size_qty_material?: string | null
+          stop_reason?: string | null
           task_code?: string | null
           task_name: string
           updated_at?: string
@@ -393,6 +401,7 @@ export type Database = {
           deleted_at?: string | null
           delivered?: boolean
           delivery_due_date?: string | null
+          delivery_due_time?: string | null
           design_brief?: string | null
           design_checklist?: Json
           design_start_date?: string | null
@@ -410,11 +419,14 @@ export type Database = {
           overall_status?: Database["public"]["Enums"]["overall_status"]
           priority?: Database["public"]["Enums"]["priority"]
           products?: Database["public"]["Enums"]["product_service"][]
+          reopen_note?: string | null
           request_date?: string | null
+          revision_note?: string | null
           sales_checklist?: Json
           sales_client_revisions?: string | null
           sales_owner_id?: string | null
           size_qty_material?: string | null
+          stop_reason?: string | null
           task_code?: string | null
           task_name?: string
           updated_at?: string
