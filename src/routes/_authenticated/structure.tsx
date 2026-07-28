@@ -27,7 +27,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Archive, ArchiveRestore, Calendar, Copy, FileStack, Layers, Plus, ShieldAlert, Star, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, Calendar, Copy, FileStack, Layers, Plus, ShieldAlert, Star, Trash2, Columns3, ArrowUp, ArrowDown, Eye, EyeOff } from "lucide-react";
 
 import { toast } from "sonner";
 import { formatDateTime } from "@/lib/format";
@@ -543,6 +543,7 @@ function TemplatesPanel() {
                     {t.description && <div className="text-xs text-muted-foreground mt-1">{t.description}</div>}
                   </div>
                   <div className="flex gap-1">
+                    <ColumnsEditorDialog template={t} />
                     <EditTemplateDialog template={t} />
                     <Button size="sm" variant="outline"
                       onClick={() => upd.mutate({ id: t.id, patch: { is_system_default: true } })}
@@ -687,6 +688,129 @@ function EditTemplateDialog({ template }: { template: any }) {
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>إلغاء</Button>
           <Button onClick={() => mut.mutate()} disabled={!name.trim() || mut.isPending}>حفظ</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ============================================================
+// COLUMNS EDITOR
+// ============================================================
+
+type ColumnDef = {
+  key: string;
+  label_ar: string;
+  visible: boolean;
+  order: number;
+  width?: number;
+  pinned?: boolean;
+};
+
+function ColumnsEditorDialog({ template }: { template: any }) {
+  const qc = useQueryClient();
+  const updFn = useServerFn(updateTemplate);
+  const [open, setOpen] = useState(false);
+  const initial: ColumnDef[] = Array.isArray(template.columns_config) ? template.columns_config : [];
+  const [cols, setCols] = useState<ColumnDef[]>(
+    [...initial].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+  );
+
+  const mut = useMutation({
+    mutationFn: () => updFn({ data: { id: template.id, patch: {
+      columns_config: cols.map((c, i) => ({ ...c, order: i + 1 })),
+    } } }),
+    onSuccess: () => {
+      toast.success("تم حفظ الأعمدة");
+      qc.invalidateQueries({ queryKey: ["structure-templates"] });
+      setOpen(false);
+    },
+    onError: (e: any) => toast.error(e.message || "فشل الحفظ"),
+  });
+
+  function toggle(i: number) {
+    setCols((prev) => prev.map((c, idx) => idx === i ? { ...c, visible: !c.visible } : c));
+  }
+  function move(i: number, dir: -1 | 1) {
+    const j = i + dir;
+    if (j < 0 || j >= cols.length) return;
+    setCols((prev) => {
+      const arr = [...prev];
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+      return arr;
+    });
+  }
+  function setLabel(i: number, v: string) {
+    setCols((prev) => prev.map((c, idx) => idx === i ? { ...c, label_ar: v } : c));
+  }
+  function setWidth(i: number, v: string) {
+    const n = parseInt(v, 10);
+    setCols((prev) => prev.map((c, idx) => idx === i ? { ...c, width: isNaN(n) ? undefined : n } : c));
+  }
+  function resetOpen(o: boolean) {
+    setOpen(o);
+    if (o) setCols([...initial].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)));
+  }
+
+  const visibleCount = cols.filter((c) => c.visible).length;
+
+  return (
+    <Dialog open={open} onOpenChange={resetOpen}>
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline"><Columns3 className="h-3.5 w-3.5 ml-1" /> الأعمدة</Button>
+      </DialogTrigger>
+      <DialogContent dir="rtl" className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>إدارة أعمدة القالب — {template.name}</DialogTitle>
+        </DialogHeader>
+        <div className="text-xs text-muted-foreground pb-2">
+          {visibleCount} عمود ظاهر من أصل {cols.length}. استخدم الأسهم لإعادة الترتيب.
+        </div>
+        {cols.length === 0 ? (
+          <div className="text-sm text-muted-foreground text-center py-6">
+            لا توجد أعمدة معرّفة. سيتم تطبيق الأعمدة الافتراضية تلقائيًا عند الحفظ لأول مرة.
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            {cols.map((c, i) => (
+              <div key={c.key} className={`flex items-center gap-2 border rounded-md p-2 ${c.visible ? "" : "opacity-60"}`}>
+                <div className="flex flex-col gap-0.5">
+                  <Button size="sm" variant="ghost" className="h-5 w-5 p-0" onClick={() => move(i, -1)} disabled={i === 0}>
+                    <ArrowUp className="h-3 w-3" />
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-5 w-5 p-0" onClick={() => move(i, 1)} disabled={i === cols.length - 1}>
+                    <ArrowDown className="h-3 w-3" />
+                  </Button>
+                </div>
+                <div className="text-xs font-mono text-muted-foreground w-24 truncate" title={c.key}>{c.key}</div>
+                <Input
+                  value={c.label_ar}
+                  onChange={(e) => setLabel(i, e.target.value)}
+                  className="h-8 flex-1"
+                  placeholder="اسم العمود بالعربية"
+                />
+                <Input
+                  type="number"
+                  value={c.width ?? ""}
+                  onChange={(e) => setWidth(i, e.target.value)}
+                  className="h-8 w-20"
+                  placeholder="عرض"
+                />
+                <Button
+                  size="sm"
+                  variant={c.visible ? "default" : "outline"}
+                  className="h-8"
+                  onClick={() => toggle(i)}
+                >
+                  {c.visible ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>إلغاء</Button>
+          <Button onClick={() => mut.mutate()} disabled={mut.isPending}>حفظ التغييرات</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
