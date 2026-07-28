@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { listTasks, updateTask, archiveTask, softDeleteTask, listProfiles } from "@/lib/tasks.functions";
@@ -58,7 +58,7 @@ const DEFAULT_VISIBLE = ALL_COLUMNS.map((c) => c.key);
 
 type View = "table" | "kanban" | "mine" | "delayed" | "completed";
 
-export function TasksExplorer({ monthCode, currentUserId }: { monthCode?: string; currentUserId?: string }) {
+export function TasksExplorer({ monthCode, currentUserId, openTaskId }: { monthCode?: string; currentUserId?: string; openTaskId?: string | null }) {
   const qc = useQueryClient();
   const listFn = useServerFn(listTasks);
   const updateFn = useServerFn(updateTask);
@@ -85,6 +85,8 @@ export function TasksExplorer({ monthCode, currentUserId }: { monthCode?: string
   const [page, setPage] = useState(1);
   const [pageSize] = useState(20);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  // Deep-link support: /tasks?open=<task_id>
+  useEffect(() => { if (openTaskId) setSelectedTaskId(openTaskId); }, [openTaskId]);
 
   const enriched = useMemo(() => (tasks as Task[]).map((t) => ({
     ...t,

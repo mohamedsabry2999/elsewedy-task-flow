@@ -261,6 +261,22 @@ export const markNotificationRead = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+// Claim playback rights atomically. Only the first caller gets claimed=true.
+export const markNotificationPlayed = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string }) => d)
+  .handler(async ({ data, context }) => {
+    const { data: rows, error } = await context.supabase
+      .from("notifications")
+      .update({ played_at: new Date().toISOString() } as any)
+      .eq("id", data.id)
+      .eq("user_id", context.userId)
+      .is("played_at", null)
+      .select("id");
+    if (error) return { claimed: false };
+    return { claimed: (rows?.length ?? 0) > 0 };
+  });
+
 export const dashboardStats = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
