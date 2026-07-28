@@ -98,6 +98,41 @@ function SettingsPage() {
               تجربة الصفارة
             </Button>
           </div>
+
+          <div className="border-t pt-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>إشعارات سطح المكتب</Label>
+                <p className="text-xs text-muted-foreground">
+                  الحالة: {desktopPerm === "granted" ? "مسموح" : desktopPerm === "denied" ? "مرفوض من المتصفح" : desktopPerm === "unsupported" ? "غير مدعوم" : "لم يُطلب بعد"}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {desktopPerm !== "granted" && desktopPerm !== "unsupported" && (
+                  <Button size="sm" variant="outline" onClick={async () => {
+                    const p = await requestDesktopPermission(); setDesktopPerm(p);
+                    if (p === "granted") setDesktopEnabled(true);
+                  }}>طلب الإذن</Button>
+                )}
+                <Switch checked={desktopEnabled} disabled={desktopPerm !== "granted"} onCheckedChange={setDesktopEnabled} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">ساعة بدء الوضع الهادئ (0-23)</Label>
+                <Input type="number" min={0} max={23} value={quietStart} onChange={(e) => setQuietStart(e.target.value)} placeholder="—" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">ساعة انتهاء الوضع الهادئ (0-23)</Label>
+                <Input type="number" min={0} max={23} value={quietEnd} onChange={(e) => setQuietEnd(e.target.value)} placeholder="—" />
+              </div>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              خلال الساعات الهادئة يتم إسكات الأصوات وإشعارات سطح المكتب (يستثنى العاجل).
+            </p>
+          </div>
+
           <Button onClick={() => save.mutate()} disabled={save.isPending}>حفظ التفضيلات</Button>
         </CardContent>
       </Card>
