@@ -34,15 +34,17 @@ function MonthPage() {
   if (!staticM && isLoading) return <div className="p-8 text-muted-foreground">جارٍ التحميل…</div>;
   if (!staticM && !dbMonth) throw notFound();
 
-  const m = staticM ?? {
-    slug: dbMonth!.slug,
-    code: dbMonth!.month_code ?? dbMonth!.slug.toUpperCase().slice(0, 3),
-    label: dbMonth!.name_ar,
-    emoji: dbMonth!.emoji ?? "📅",
-    verse: dbMonth!.verse ?? "",
-    ref: dbMonth!.verse_ref ?? "",
-    line: dbMonth!.line ?? "",
+  const dm: any = dbMonth;
+  const m: any = staticM ?? {
+    slug: dm.slug,
+    code: dm.month_code ?? String(dm.slug).toUpperCase().slice(0, 3),
+    label: dm.name_ar,
+    emoji: dm.emoji ?? "📅",
+    verse: dm.verse ?? "",
+    ref: dm.verse_ref ?? "",
+    line: dm.line ?? "",
   };
+
 
   return (
     <div className="space-y-6">
