@@ -6,7 +6,7 @@ import { TasksExplorer } from "@/components/tasks/TasksExplorer";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
-export const Route = createFileRoute("/_authenticated/tasks")({
+export const Route = createFileRoute("/_authenticated/tasks/")({
   component: TasksPage,
   head: () => ({ meta: [{ title: "كل المهام — Elsewedy Task Flow" }] }),
 });
