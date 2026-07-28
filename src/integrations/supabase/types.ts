@@ -17,6 +17,7 @@ export type Database = {
       notification_preferences: {
         Row: {
           created_at: string
+          desktop_enabled: boolean
           event_toggles: Json
           quiet_hours_end: number | null
           quiet_hours_start: number | null
@@ -28,6 +29,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          desktop_enabled?: boolean
           event_toggles?: Json
           quiet_hours_end?: number | null
           quiet_hours_start?: number | null
@@ -39,6 +41,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          desktop_enabled?: boolean
           event_toggles?: Json
           quiet_hours_end?: number | null
           quiet_hours_start?: number | null
