@@ -291,13 +291,15 @@ function renderCell(r: any, k: string) {
   if (k === "task_code") return <span className="font-mono text-xs">{v}</span>;
   if (k === "delivered") return v ? "✓" : "—";
   if (k === "files_url" || k === "final_version_url") return v ? <a className="text-primary hover:underline" href={v} target="_blank" rel="noreferrer">فتح</a> : "—";
-  if (["request_date","design_start_date","delivery_due_date","actual_delivery_date"].includes(k)) return formatDate(v);
+  if (k === "delivery_due_date") return formatDueDateTime(v, r.delivery_due_time);
+  if (["request_date","design_start_date","actual_delivery_date"].includes(k)) return formatDate(v);
   return v ?? "—";
 }
 function formatCell(r: any, k: string) {
   const v = r[k];
   if (k === "products") return (Array.isArray(v) ? v : []).join("، ");
-  if (["request_date","design_start_date","delivery_due_date","actual_delivery_date"].includes(k)) return formatDate(v);
+  if (k === "delivery_due_date") return formatDueDateTime(v, r.delivery_due_time);
+  if (["request_date","design_start_date","actual_delivery_date"].includes(k)) return formatDate(v);
   if (k === "delivered") return v ? "نعم" : "لا";
   return v ?? "";
 }
