@@ -758,7 +758,12 @@ function QuickUpdateDialog({ task, profiles, onClose }: { task: any; profiles: a
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>إلغاء</Button>
-          <Button disabled={Object.keys(diff).length === 0 && !form.note.trim() || submit.isPending}
+          <Button
+            disabled={
+              (Object.keys(diff).length === 0 && !form.note.trim())
+              || submit.isPending
+              || needsStopReason || needsRevisionNote || needsReopenNote
+            }
             onClick={() => submit.mutate()}>حفظ التحديث</Button>
         </DialogFooter>
       </DialogContent>
