@@ -15,6 +15,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { formatDateTime } from "@/lib/format";
 import { isAdminRole } from "@/lib/permissions";
+import { BrandMark } from "@/components/brand/BrandMark";
+import { BrandSplash } from "@/components/brand/BrandSplash";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -23,6 +25,7 @@ export const Route = createFileRoute("/_authenticated")({
     if (error || !data.user) throw redirect({ to: "/auth" });
     return { user: data.user };
   },
+  pendingComponent: () => <BrandSplash label="جارٍ تحميل مساحة العمل…" />,
   component: AuthLayout,
 });
 
@@ -52,14 +55,8 @@ function AuthLayout() {
   return (
     <div className="min-h-screen bg-secondary/40" dir="rtl">
       <aside className="fixed inset-y-0 right-0 w-64 border-l bg-sidebar text-sidebar-foreground p-4 flex flex-col gap-4">
-        <Link to="/dashboard" className="flex items-center gap-2 px-2 py-3">
-          <div className="h-9 w-9 rounded-lg brand-gradient flex items-center justify-center text-white font-bold">
-            E
-          </div>
-          <div>
-            <div className="text-base font-bold leading-tight">Elsewedy</div>
-            <div className="text-xs text-muted-foreground">Task Flow</div>
-          </div>
+        <Link to="/dashboard" className="flex items-center justify-center px-2 py-3 border-b border-sidebar-border/60">
+          <BrandMark size="lg" priority className="mx-auto" />
         </Link>
 
         <nav className="flex flex-col gap-1">
