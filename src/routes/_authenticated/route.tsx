@@ -5,7 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { myRoles, listNotifications, markNotificationRead } from "@/lib/tasks.functions";
 import { ROLE_LABEL, MONTHS, type AppRole } from "@/lib/i18n";
 import {
-  LayoutDashboard, ListTodo, Calendar, Users, History, Settings, LogOut, Bell,
+  LayoutDashboard, ListTodo, Calendar, ShieldCheck, History, Settings, LogOut, Bell,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { formatDateTime } from "@/lib/format";
+import { isAdminRole } from "@/lib/permissions";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -25,12 +26,12 @@ export const Route = createFileRoute("/_authenticated")({
   component: AuthLayout,
 });
 
-const NAV = [
-  { to: "/dashboard", label: "لوحة القيادة", icon: LayoutDashboard },
-  { to: "/tasks", label: "كل المهام", icon: ListTodo },
-  { to: "/team", label: "الفريق", icon: Users },
-  { to: "/activity", label: "سجل النشاط", icon: History },
-  { to: "/settings", label: "الإعدادات", icon: Settings },
+const NAV_BASE = [
+  { to: "/dashboard", label: "لوحة القيادة", icon: LayoutDashboard, admin: false },
+  { to: "/tasks", label: "كل المهام", icon: ListTodo, admin: false },
+  { to: "/team", label: "المستخدمون والصلاحيات", icon: ShieldCheck, admin: true },
+  { to: "/activity", label: "سجل النشاط", icon: History, admin: false },
+  { to: "/settings", label: "الإعدادات", icon: Settings, admin: false },
 ];
 
 function AuthLayout() {
