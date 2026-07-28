@@ -67,15 +67,19 @@ function StructurePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">إدارة السنوات والشهور والقوالب</h1>
-        <p className="text-sm text-muted-foreground">إدارة هيكل النظام وقوالب المهام لكل شهر.</p>
+        <h1 className="text-2xl font-bold">إدارة هيكل النظام</h1>
+        <p className="text-sm text-muted-foreground">الأقسام وأنواع المهام والسنوات والشهور وقوالب المهام.</p>
       </div>
-      <Tabs defaultValue="years" dir="rtl">
+      <Tabs defaultValue="departments" dir="rtl">
         <TabsList>
+          <TabsTrigger value="departments">الأقسام</TabsTrigger>
+          <TabsTrigger value="task-types">أنواع المهام</TabsTrigger>
           <TabsTrigger value="years">السنوات والشهور</TabsTrigger>
           <TabsTrigger value="templates">القوالب</TabsTrigger>
-          <TabsTrigger value="audit">سجل تعديلات الهيكل</TabsTrigger>
+          <TabsTrigger value="audit">سجل التعديلات</TabsTrigger>
         </TabsList>
+        <TabsContent value="departments" className="mt-4"><DepartmentsPanel /></TabsContent>
+        <TabsContent value="task-types" className="mt-4"><TaskTypesPanel /></TabsContent>
         <TabsContent value="years" className="mt-4"><YearsPanel /></TabsContent>
         <TabsContent value="templates" className="mt-4"><TemplatesPanel /></TabsContent>
         <TabsContent value="audit" className="mt-4"><AuditPanel /></TabsContent>
