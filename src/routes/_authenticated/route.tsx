@@ -63,7 +63,7 @@ function AuthLayout() {
         </Link>
 
         <nav className="flex flex-col gap-1">
-          {NAV.map(({ to, label, icon: Icon }) => {
+          {NAV_BASE.filter((n) => !n.admin || isAdminRole(roles)).map(({ to, label, icon: Icon }) => {
             const active = location.pathname === to || location.pathname.startsWith(to + "/");
             return (
               <Link
