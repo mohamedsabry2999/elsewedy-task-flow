@@ -26,7 +26,9 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Archive, ArchiveRestore, Calendar, Plus, ShieldAlert, Star, Trash2 } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Archive, ArchiveRestore, Calendar, Copy, FileStack, Layers, Plus, ShieldAlert, Star, Trash2 } from "lucide-react";
+
 import { toast } from "sonner";
 import { formatDateTime } from "@/lib/format";
 
