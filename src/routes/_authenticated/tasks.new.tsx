@@ -26,7 +26,7 @@ function NewTaskPage() {
     customer_name: "", customer_type: "عميل حالي", products: [] as string[],
     order_details: "", size_qty_material: "", design_brief: "",
     priority: "عادية", request_date: new Date().toISOString().slice(0, 10),
-    designer_id: null, delivery_due_date: null,
+    designer_id: null, delivery_due_date: null, delivery_due_time: null,
   });
   const set = (patch: any) => setState((s: any) => ({ ...s, ...patch }));
 
@@ -127,8 +127,11 @@ function NewTaskPage() {
                   <SelectContent>{profiles.map((p) => <SelectItem key={p.id} value={p.id}>{p.full_name || p.email}</SelectItem>)}</SelectContent>
                 </Select>
               </Field>
-              <Field label="موعد التسليم">
+              <Field label="تاريخ التسليم">
                 <Input type="date" value={state.delivery_due_date ?? ""} onChange={(e) => set({ delivery_due_date: e.target.value || null })} />
+              </Field>
+              <Field label="وقت التسليم">
+                <Input type="time" value={state.delivery_due_time ?? ""} onChange={(e) => set({ delivery_due_time: e.target.value || null })} />
               </Field>
               <div className="text-sm text-muted-foreground p-3 bg-secondary/50 rounded">
                 <div><strong>ملخص:</strong> {state.task_name}</div>
