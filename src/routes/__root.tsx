@@ -77,10 +77,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:description", content: "منصة إدارة مهام السيلز والتصميم لدار السويدي للطباعة" },
       { property: "og:image", content: BRAND_LOGO_URL },
       { name: "twitter:image", content: BRAND_LOGO_URL },
+      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/4CMQCcvJ6Tg98o3LvVdF4VYsnuo1/social-images/social-1785231013915-ChatGPT_Image_Jul_28,_2026,_12_29_43_PM.webp" },
+      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/4CMQCcvJ6Tg98o3LvVdF4VYsnuo1/social-images/social-1785231013915-ChatGPT_Image_Jul_28,_2026,_12_29_43_PM.webp" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
-      { rel: "icon", type: "image/png", href: "/favicon.png" },
       { rel: "apple-touch-icon", href: "/favicon.png" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
