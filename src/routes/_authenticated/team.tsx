@@ -111,9 +111,9 @@ function TeamPage() {
     const total = users.length;
     const active = users.filter((u) => u.is_active && !u.archived_at).length;
     const suspended = users.filter((u) => !u.is_active && !u.archived_at).length;
-    const sales = users.filter((u) => (u.roles ?? []).some((r) => r === "sales_manager" || r === "sales_executive")).length;
-    const design = users.filter((u) => (u.roles ?? []).some((r) => r === "design_manager" || r === "designer")).length;
-    const managers = users.filter((u) => (u.roles ?? []).some((r) => r === "super_admin" || r === "admin" || r === "sales_manager" || r === "design_manager")).length;
+    const sales = users.filter((u) => (u.roles ?? []).some((r: string) => r === "sales_manager" || r === "sales_executive")).length;
+    const design = users.filter((u) => (u.roles ?? []).some((r: string) => r === "design_manager" || r === "designer")).length;
+    const managers = users.filter((u) => (u.roles ?? []).some((r: string) => r === "super_admin" || r === "admin" || r === "sales_manager" || r === "design_manager")).length;
     return { total, active, suspended, sales, design, managers };
   }, [users]);
 
