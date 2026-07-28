@@ -171,29 +171,43 @@ export const quickUpdateTask = createServerFn({ method: "POST" })
     id: string;
     patch: Record<string, unknown>;
     note?: string;
+    expected_updated_at?: string | null;
   }) => d)
   .handler(async ({ data, context }) => {
     const { data: cur, error: getErr } = await context.supabase
       .from("tasks").select("*").eq("id", data.id).maybeSingle();
     if (getErr) throw new Error(getErr.message);
     if (!cur) throw new Error("التاسك غير موجود");
+    if (data.expected_updated_at && cur.updated_at !== data.expected_updated_at) {
+      throw new Error("تعارض في التعديل: قام مستخدم آخر بتعديل هذا التاسك. حدّث الصفحة وحاول مجددًا.");
+    }
 
     const next: any = { ...cur, ...data.patch };
+    const targetStatus = data.patch.overall_status ?? cur.overall_status;
 
-    // Transition validations
+    // Client-side pre-validation (DB triggers still enforce)
     const missing: string[] = [];
     if (data.patch.overall_status === "جاهز للتصميم") {
       if (!next.customer_name?.trim()) missing.push("اسم العميل");
       if (!next.products || (next.products as string[]).length === 0) missing.push("المنتج / الخدمة");
       if (!next.order_details?.trim()) missing.push("تفاصيل الطلب");
       if (!next.design_brief?.trim()) missing.push("المطلوب من التصميم");
-      if (!next.delivery_due_date) missing.push("موعد التسليم");
+      if (!next.delivery_due_date) missing.push("تاريخ التسليم");
+      if (!next.delivery_due_time) missing.push("وقت التسليم");
     }
     if (data.patch.overall_status === "قيد التصميم" && !next.design_start_date) {
       (data.patch as any).design_start_date = new Date().toISOString().slice(0, 10);
     }
-    if (data.patch.overall_status === "بانتظار الاعتماد") {
-      if (!next.files_url && !next.final_version_url) missing.push("رابط ملف تصميم واحد على الأقل");
+    if (data.patch.overall_status === "متوقف" && !next.stop_reason?.trim()) {
+      missing.push("سبب الإيقاف");
+    }
+    if (data.patch.overall_status === "تعديلات"
+        && !next.revision_note?.trim() && !next.sales_client_revisions?.trim()) {
+      missing.push("سبب/ملاحظة التعديل");
+    }
+    if (cur.overall_status === "مكتمل" && targetStatus !== "مكتمل"
+        && !next.reopen_note?.trim()) {
+      missing.push("سبب إعادة الفتح");
     }
     if (data.patch.overall_status === "مكتمل") {
       if (next.design_status !== "معتمد") missing.push("حالة التصميم يجب أن تكون معتمد");
