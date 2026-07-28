@@ -17,6 +17,10 @@ const taskInputSchema = z.object({
   request_date: z.string().nullable().optional(),
   designer_id: z.string().uuid().nullable().optional(),
   delivery_due_date: z.string().nullable().optional(),
+  delivery_due_time: z.string().nullable().optional(),
+  stop_reason: z.string().nullable().optional(),
+  revision_note: z.string().nullable().optional(),
+  reopen_note: z.string().nullable().optional(),
   overall_status: z.string().default("جديد"),
 });
 
