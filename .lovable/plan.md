@@ -1,84 +1,108 @@
-# Final Security, Notifications & Workflow QA — خطة التنفيذ
+# توسيع Elsewedy Task Flow لدعم جميع الأقسام
 
-الطلب كبير جدًا (17 قسم). سأنفّذه على 8 دفعات آمنة متتابعة بدون إعادة بناء المشروع، مع الحفاظ على البيانات والتصميم والـRTL والخط Cairo واللوجو الحالي.
+هذا تطوير ضخم يمس البنية الأساسية (قاعدة البيانات، RLS، Storage، الواجهة، الصلاحيات، Workflows). لن أنفّذه في جلسة واحدة — سأقسّمه إلى **4 مراحل مستقلة**، وأنتظر تأكيدك قبل كل مرحلة.
 
-## قبل البدء — فحص سريع للوضع الحالي
-- قراءة `overdue-scan.ts`, `TaskDetailDrawer.tsx`, `TasksExplorer.tsx`, `route.tsx (authenticated)`, `settings.tsx`, `tasks.functions.ts`, `permissions.ts`, `notification-sound.ts`, ملف RLS الحالي لـ`task-files`.
-- التأكد من أعمدة `notifications` و`tasks.due_at` و`notification_preferences`.
+## المبادئ الحاكمة
 
-## الدفعة 1 — تأمين overdue-scan + Cron حقيقي (بند 1)
-- إنشاء Secret `OVERDUE_SCAN_SECRET` عبر `generate_secret`.
-- تعديل `/api/public/hooks/overdue-scan.ts`:
-  - رفض GET، قبول POST فقط.
-  - قراءة `Authorization: Bearer <OVERDUE_SCAN_SECRET>` بمقارنة `timingSafeEqual`.
-  - Rate limit بسيط (In-memory per-IP: 6/min).
-  - استجابة عامة `{ok:true}` بدون تفاصيل داخلية عند الخطأ.
-  - Logs مختصرة server-side.
-- إعادة جدولة `pg_cron` كل ساعة بالـSecret الجديد (استخدام `supabase--insert` لأنه بيانات وليس schema).
-- التوقيت Africa/Cairo مضمون عبر `due_at` (محسوب من `set_task_due_at`).
-- تحديث README بخطوات إعداد Secret/Cron (بدون قيمة).
+- **عدم كسر السيلز/التصميم**: كل ما هو موجود يبقى يعمل. الأعمدة القديمة (`sales_owner_id`, `designer_id`) تبقى مؤقتًا مع Backfill إلى `task_assignments`.
+- **ديناميكية كاملة**: لا أقسام Hardcoded، لا أنواع مهام ثابتة، لا Workflows مثبتة في الكود.
+- **RLS أولًا**: أي جدول جديد يتضمن Policies + Grants في نفس الـMigration.
+- **Migration واحدة لكل مرحلة**، وموافقتك عليها شرط للانتقال.
 
-## الدفعة 2 — موعد التسليم بتاريخ ووقت (بند 2) + قواعد الحالات (بند 10)
-- Migration واحد:
-  - إضافة `delivery_due_time TIME` (nullable) — لا نغيّر `delivery_due_date`.
-  - تعديل `set_task_due_at` لدمج التاريخ + الوقت (افتراضي 23:59) بتوقيت Africa/Cairo.
-  - إضافة `stop_reason TEXT`, `revision_note TEXT`, `reopen_note TEXT` على `tasks`.
-  - تحديث `validate_task_transitions`:
-    - "متوقف" ⇐ يتطلّب `stop_reason`.
-    - "تعديلات" ⇐ يتطلّب `revision_note` (أو `sales_client_revisions`).
-    - إعادة فتح من "مكتمل" ⇐ يتطلّب `reopen_note` + admin/manager.
-    - "مكتمل" ⇐ ملف من نوع "نهائية" **أو** `final_version_url` + `delivered=true` + `actual_delivery_date`.
-  - Trigger يسجّل السبب/الملاحظة داخل `task_activity`.
-- UI: حقل `TimePicker` بجانب التاريخ في Quick Update و Full Edit، عرض الوقت 12-ساعة ص/م في الجدول والـDrawer والإشعارات.
+---
 
-## الدفعة 3 — إشعارات: منع تكرار الصوت + تفعيل صحيح + Deep Link (بنود 3، 4، 5)
-- `src/lib/notification-audio.ts` (جديد):
-  - `BroadcastChannel('elsewedy-notif-audio')` لمزامنة التابات.
-  - قبل التشغيل: `update notifications set played_at=now() where id=? and played_at is null returning id` — إذا لم يرجع صف، لا تشغّل.
-  - Deduplication key = `notification.id`.
-- Banner "فعّل صوت التنبيهات" داخل TopBar عند عدم وجود موافقة محلية؛ زر واحد يستدعي `unlockAudio` + صوت تجريبي + حفظ في `notification_preferences.sounds_enabled=true`.
-- إصلاح زر الصوت الحالي (أول ضغطة = تفعيل).
-- منع تداخل الصفارات (mutex بسيط).
-- إشعار → Deep link: `/tasks?open=<task_id>` — يعمل بعد Refresh، يفتح Drawer، يعلّم كمقروء، رسالة واضحة لو محذوف/بدون صلاحية.
+## المرحلة الأولى — الأساس التنظيمي (Foundation)
 
-## الدفعة 4 — تطوير مركز الإشعارات + الأنواع (بند 6) + Reminders (بند 14)
-- Dropdown بتبويبات (الكل/غير المقروء/عاجل)، Load More، عداد، Pulse أحمر عاجل، زر "فتح التاسك"، Empty State، "تعليم الكل كمقروء".
-- Migration: إضافة triggers للأحداث الناقصة (revision request, task stopped/reopened, final uploaded)، deduplication في `overdue_events` مع `stage` (24h/4h/1h/overdue).
-- تحديث `overdue-scan` ليولّد reminders بالمراحل الأربع مع dedupe، ولا يشمل مؤرشف/محذوف/متوقف/مكتمل.
+**الجداول الجديدة:**
+- `departments` (name_ar, name_en, key, color, icon, description, sort_order, is_archived)
+- `department_memberships` (user_id, department_id, role, is_primary, starts_at, ends_at, active)
+- `task_types` (department_id nullable للأنواع العامة, name_ar, name_en, key, color, icon, default_priority, default_sla_hours, is_archived)
+- `task_assignments` (task_id, user_id, department_id, role, stage, is_primary, assigned_by, assigned_at, completed_at, active)
+- `task_departments` (task_id, department_id, stage_order, is_current)
+- إضافة أعمدة على `tasks`: `department_id`, `task_type_id`, `workflow_kind` (department/cross_dept/request/approval/recurring/project/sales_design)
 
-## الدفعة 5 — إعدادات الإشعارات الكاملة (بند 7) + Desktop Notifications (بند 13)
-- توسيع `notification_preferences`: `desktop_enabled`, `event_toggles jsonb`, `work_hours`, `quiet_hours_start/end` (موجود جزئيًا)، `overdue_repeat` (1h/2h/4h/daily)، `notify_outside_hours`.
-- صفحة `settings.tsx`: كل الخيارات المطلوبة + زر طلب Permission + عرض الحالة + Reset defaults.
-- Web Notifications API عند الأحداث المحددة، مع احترام Quiet Hours وعدم عرضها لو المستخدم داخل نفس التاسك.
+**الصلاحيات الجديدة (app_role جديدة أو Overrides):**
+- `manage_departments`, `manage_department_members`, `manage_task_types`, `view_department_tasks`, `view_all_department_tasks`, `assign_department_tasks`
 
-## الدفعة 6 — تأمين ملفات التاسكات (بنود 8، 9)
-- Storage RLS policies جديدة على `storage.objects` bucket `task-files`:
-  - SELECT/INSERT/DELETE مقيّدة بدالة `public.can_access_task_files(task_id, user_id)` تفحص admin/manager/sales_owner/designer/override.
-- `listTaskFiles`, `signTaskFileUrl`, `recordTaskFile`, `deleteTaskFile` — فحص server-side قبل أي عملية.
-- حد حجم (25MB) + قائمة MIME مسموحة، رسائل واضحة.
-- ربط بالمراحل: `validate_task_transitions` يستدعي وجود مرفق "نهائية" لحالة "مكتمل"، ومرفق أي نوع لـ"بانتظار الاعتماد".
+**تحديث `can_view_task`** بالترتيب:
+1. Super Admin / System Supervisor → allow
+2. Explicit deny في `user_permission_overrides` → deny
+3. Explicit allow → allow
+4. Department Manager لقسم مرتبط بالتاسك → allow
+5. Assignment نشط في `task_assignments` → allow
+6. الحقول القديمة (sales_owner/designer) → allow (توافق خلفي)
+7. افتراضيًا → deny
 
-## الدفعة 7 — Permissions Overrides حقيقية (بند 11) + تحسين التعديل (بند 12)
-- دالة `public.effective_permission(user_id, key)` تطبّق الأولوية: SuperAdmin > Override > Role > Ownership.
-- استخدامها في `enforce_task_field_permissions` و`can_access_task_files`.
-- تسجيل تغييرات الـoverrides في `task_activity`/audit.
-- Optimistic locking: فحص `updated_at` قبل الحفظ في `quickUpdateTask` و`updateTask`؛ رسالة تعارض عربية.
-- تسجيل جميع تغييرات الحقول (from→to) — موجود جزئيًا، إكمال الحقول الناقصة.
+**Migration ترحيل السيلز/التصميم:**
+- إنشاء قسمَي "المبيعات" و"التصميم" مع Keys ثابتة.
+- ربط المستخدمين حسب أدوارهم الحالية.
+- إنشاء Task Type "Sales-to-Design" مربوط بالقسمين.
+- Backfill `task_assignments` من `sales_owner_id` + `designer_id` لكل التاسكات الموجودة.
+- عدم حذف الحقول القديمة.
 
-## الدفعة 8 — Mobile/Responsive + QA نهائي (بنود 15، 16، 17)
-- مراجعة 360/390/768: Drawer full-screen موبايل، Tabs scrollable، جدول → cards، Sheet sidebar، جرس على الموبايل.
-- تشغيل build/typecheck/lint.
-- Playwright: سيناريوهات RLS/permissions/notification dedupe/deep-link/transition rules (المتاح منها بدون auth مركّب).
-- تقرير نهائي.
+**الواجهة:**
+- صفحة جديدة "إدارة الأقسام" داخل `/structure` كتبويب ثالث بجانب "السنوات والشهور" و"القوالب".
+- CRUD كامل + Drag-and-drop للترتيب + بحث + فلترة.
+- تبويب فرعي "الأعضاء" داخل كل قسم لإدارة العضويات.
 
-## ملاحظات تقنية
-- كل schema change → migration منفصل (لن تُدمج مع كتابة كود في نفس النداء).
-- لن نمس `client.ts` أو `types.ts` الآلية.
-- لن نغيّر اللوجو (مثبّت بالفعل)، فقط نتأكد من ظهوره في auth/sidebar/mobile/favicon.
-- كل الأصوات تبقى عبر WebAudio synth الحالي (بدون MP3 خارجية).
+**شروط القبول للمرحلة الأولى:**
+- إنشاء/أرشفة قسم من الواجهة يعمل.
+- إضافة أعضاء بأدوار مختلفة.
+- كل تاسك موجود مربوط بقسم + نوع + Assignments صحيحة.
+- السيلز/التصميم يعملان بدون أي تغيير مرئي.
+- Type-check نظيف.
 
-## خطوات يدوية متوقعة منك
-- الموافقة على الـmigrations عند ظهورها.
-- (اختياري) مراجعة قيمة `OVERDUE_SCAN_SECRET` بعد التوليد — لن أعرضها.
+---
 
-هل تريد أن أبدأ فورًا بالدفعة 1؟
+## المرحلة الثانية — Workflows الديناميكية
+
+- `workflow_definitions` + `workflow_stages` + `workflow_transitions` مربوطة بـ Task Type.
+- تحديث `task_templates` لدعم `department_id` و `task_type_id`.
+- طبقات الحقول (Global / Department / Task Type / Stage / Month) مع أولوية الحل.
+- الحالات (statuses_config) تصبح مرتبطة بالـWorkflow لا بالنظام.
+- صفحات ولوحات الأقسام الديناميكية (`/departments/$key`) مع KPIs مشابهة للـDashboard.
+- Sidebar ديناميكي يعرض فقط أقسام المستخدم.
+
+## المرحلة الثالثة — التعاون بين الأقسام
+
+- Cross-Department Tasks مع Timeline ونقل تلقائي.
+- `interdepartment_requests` (طلب/رفض/سبب/تقييم).
+- `recurring_task_rules` + Job لإنشاء النسخ (`pg_cron` + endpoint موجود).
+- `sla_policies` + `company_working_days` + `company_holidays` + تصعيد.
+
+## المرحلة الرابعة — المشروعات والتقارير
+
+- `projects` + `project_members` + `project_milestones` (ميزانية بصلاحية منفصلة).
+- محرّر إنشاء تاسك جديد بـStepper (قسم → نوع → نموذج ديناميكي → مسؤولين → مراجعة).
+- تقارير شاملة + اختبارات E2E لكل دور.
+
+---
+
+## تقنيًا (للمراجعة السريعة)
+
+```text
+Phase 1 migration order:
+  1. CREATE TYPE department_role, workflow_kind
+  2. CREATE TABLE departments (+GRANT +RLS +policies)
+  3. CREATE TABLE department_memberships (+GRANT +RLS +policies)
+  4. CREATE TABLE task_types (+GRANT +RLS +policies)
+  5. CREATE TABLE task_assignments (+GRANT +RLS +policies)
+  6. CREATE TABLE task_departments (+GRANT +RLS +policies)
+  7. ALTER tasks ADD department_id, task_type_id, workflow_kind
+  8. INSERT seed: قسم Sales, قسم Design, Task Type "Sales-to-Design"
+  9. INSERT membership backfill من user_roles
+ 10. INSERT task_assignments backfill من sales_owner_id/designer_id
+ 11. UPDATE tasks SET department_id/task_type_id للسيلز-تصميم الحالية
+ 12. CREATE OR REPLACE can_view_task (النسخة الجديدة الموسّعة)
+ 13. Triggers: log_assignment_changes, prevent_delete_dept_with_data
+```
+
+---
+
+## طريقة العمل المقترحة
+
+1. **الآن**: تؤكّد الموافقة على المرحلة الأولى فقط.
+2. أنفّذ Migration المرحلة الأولى + الواجهة الأساسية لإدارة الأقسام.
+3. تختبرها، ثم ننتقل للمرحلة الثانية.
+
+هل نبدأ بالمرحلة الأولى؟ أم تريد تعديلًا على النطاق أو الترتيب (مثلًا: تأجيل Task Types إلى المرحلة الثانية، أو دمج المهام المتكررة مع الطلبات)؟

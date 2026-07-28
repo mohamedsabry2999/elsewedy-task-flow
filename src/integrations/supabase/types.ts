@@ -14,6 +14,101 @@ export type Database = {
   }
   public: {
     Tables: {
+      department_memberships: {
+        Row: {
+          active: boolean
+          created_at: string
+          created_by: string | null
+          department_id: string
+          ends_at: string | null
+          id: string
+          is_primary: boolean
+          role: Database["public"]["Enums"]["department_role"]
+          starts_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          department_id: string
+          ends_at?: string | null
+          id?: string
+          is_primary?: boolean
+          role?: Database["public"]["Enums"]["department_role"]
+          starts_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          department_id?: string
+          ends_at?: string | null
+          id?: string
+          is_primary?: boolean
+          role?: Database["public"]["Enums"]["department_role"]
+          starts_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "department_memberships_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      departments: {
+        Row: {
+          color: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          icon: string
+          id: string
+          is_archived: boolean
+          key: string
+          name_ar: string
+          name_en: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          icon?: string
+          id?: string
+          is_archived?: boolean
+          key: string
+          name_ar: string
+          name_en?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          icon?: string
+          id?: string
+          is_archived?: boolean
+          key?: string
+          name_ar?: string
+          name_en?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       months: {
         Row: {
           created_at: string
@@ -329,6 +424,69 @@ export type Database = {
           },
         ]
       }
+      task_assignments: {
+        Row: {
+          active: boolean
+          assigned_at: string
+          assigned_by: string | null
+          completed_at: string | null
+          created_at: string
+          department_id: string | null
+          id: string
+          is_primary: boolean
+          role: Database["public"]["Enums"]["assignment_role"]
+          stage: string | null
+          task_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          assigned_at?: string
+          assigned_by?: string | null
+          completed_at?: string | null
+          created_at?: string
+          department_id?: string | null
+          id?: string
+          is_primary?: boolean
+          role?: Database["public"]["Enums"]["assignment_role"]
+          stage?: string | null
+          task_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          assigned_at?: string
+          assigned_by?: string | null
+          completed_at?: string | null
+          created_at?: string
+          department_id?: string | null
+          id?: string
+          is_primary?: boolean
+          role?: Database["public"]["Enums"]["assignment_role"]
+          stage?: string | null
+          task_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_assignments_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_assignments_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       task_attachments: {
         Row: {
           created_at: string
@@ -427,6 +585,54 @@ export type Database = {
           },
         ]
       }
+      task_departments: {
+        Row: {
+          created_at: string
+          department_id: string
+          entered_at: string | null
+          exited_at: string | null
+          id: string
+          is_current: boolean
+          stage_order: number
+          task_id: string
+        }
+        Insert: {
+          created_at?: string
+          department_id: string
+          entered_at?: string | null
+          exited_at?: string | null
+          id?: string
+          is_current?: boolean
+          stage_order?: number
+          task_id: string
+        }
+        Update: {
+          created_at?: string
+          department_id?: string
+          entered_at?: string | null
+          exited_at?: string | null
+          id?: string
+          is_current?: boolean
+          stage_order?: number
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_departments_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_departments_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       task_templates: {
         Row: {
           cloned_from_id: string | null
@@ -477,6 +683,81 @@ export type Database = {
           },
         ]
       }
+      task_types: {
+        Row: {
+          code_prefix: string | null
+          color: string
+          created_at: string
+          created_by: string | null
+          default_priority: Database["public"]["Enums"]["priority"]
+          default_sla_hours: number | null
+          department_id: string | null
+          description: string | null
+          icon: string
+          id: string
+          is_archived: boolean
+          key: string
+          name_ar: string
+          name_en: string
+          sort_order: number
+          template_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          code_prefix?: string | null
+          color?: string
+          created_at?: string
+          created_by?: string | null
+          default_priority?: Database["public"]["Enums"]["priority"]
+          default_sla_hours?: number | null
+          department_id?: string | null
+          description?: string | null
+          icon?: string
+          id?: string
+          is_archived?: boolean
+          key: string
+          name_ar: string
+          name_en?: string
+          sort_order?: number
+          template_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          code_prefix?: string | null
+          color?: string
+          created_at?: string
+          created_by?: string | null
+          default_priority?: Database["public"]["Enums"]["priority"]
+          default_sla_hours?: number | null
+          department_id?: string | null
+          description?: string | null
+          icon?: string
+          id?: string
+          is_archived?: boolean
+          key?: string
+          name_ar?: string
+          name_en?: string
+          sort_order?: number
+          template_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_types_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_types_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "task_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tasks: {
         Row: {
           actual_delivery_date: string | null
@@ -488,6 +769,7 @@ export type Database = {
           delivered: boolean
           delivery_due_date: string | null
           delivery_due_time: string | null
+          department_id: string | null
           design_brief: string | null
           design_checklist: Json
           design_start_date: string | null
@@ -516,7 +798,9 @@ export type Database = {
           stop_reason: string | null
           task_code: string | null
           task_name: string
+          task_type_id: string | null
           updated_at: string
+          workflow_kind: Database["public"]["Enums"]["workflow_kind"]
         }
         Insert: {
           actual_delivery_date?: string | null
@@ -528,6 +812,7 @@ export type Database = {
           delivered?: boolean
           delivery_due_date?: string | null
           delivery_due_time?: string | null
+          department_id?: string | null
           design_brief?: string | null
           design_checklist?: Json
           design_start_date?: string | null
@@ -556,7 +841,9 @@ export type Database = {
           stop_reason?: string | null
           task_code?: string | null
           task_name: string
+          task_type_id?: string | null
           updated_at?: string
+          workflow_kind?: Database["public"]["Enums"]["workflow_kind"]
         }
         Update: {
           actual_delivery_date?: string | null
@@ -568,6 +855,7 @@ export type Database = {
           delivered?: boolean
           delivery_due_date?: string | null
           delivery_due_time?: string | null
+          department_id?: string | null
           design_brief?: string | null
           design_checklist?: Json
           design_start_date?: string | null
@@ -596,14 +884,30 @@ export type Database = {
           stop_reason?: string | null
           task_code?: string | null
           task_name?: string
+          task_type_id?: string | null
           updated_at?: string
+          workflow_kind?: Database["public"]["Enums"]["workflow_kind"]
         }
         Relationships: [
+          {
+            foreignKeyName: "tasks_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "tasks_month_id_fkey"
             columns: ["month_id"]
             isOneToOne: false
             referencedRelation: "months"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_task_type_id_fkey"
+            columns: ["task_type_id"]
+            isOneToOne: false
+            referencedRelation: "task_types"
             referencedColumns: ["id"]
           },
         ]
@@ -697,7 +1001,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_manage_department_members: {
+        Args: { _user_id: string }
+        Returns: boolean
+      }
+      can_manage_departments: { Args: { _user_id: string }; Returns: boolean }
       can_manage_structure: { Args: { _user_id: string }; Returns: boolean }
+      can_manage_task_types: { Args: { _user_id: string }; Returns: boolean }
       can_view_task: {
         Args: { _task_id: string; _user_id: string }
         Returns: boolean
@@ -721,6 +1031,10 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_department_manager: {
+        Args: { _department_id: string; _user_id: string }
+        Returns: boolean
+      }
       verify_overdue_scan_secret: { Args: { _token: string }; Returns: boolean }
     }
     Enums: {
@@ -732,7 +1046,20 @@ export type Database = {
         | "design_manager"
         | "designer"
         | "view_only"
+      assignment_role:
+        | "owner"
+        | "assignee"
+        | "reviewer"
+        | "approver"
+        | "collaborator"
+        | "follower"
       customer_type: "عميل حالي" | "عميل جديد" | "عميل محتمل"
+      department_role:
+        | "department_manager"
+        | "department_supervisor"
+        | "team_leader"
+        | "employee"
+        | "viewer"
       design_status:
         | "لم يبدأ"
         | "قيد التنفيذ"
@@ -759,6 +1086,14 @@ export type Database = {
         | "بروشور وكتالوج"
         | "شيتات 50×70"
         | "أخرى"
+      workflow_kind:
+        | "department"
+        | "cross_department"
+        | "request"
+        | "approval"
+        | "recurring"
+        | "project"
+        | "sales_to_design"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -895,7 +1230,22 @@ export const Constants = {
         "designer",
         "view_only",
       ],
+      assignment_role: [
+        "owner",
+        "assignee",
+        "reviewer",
+        "approver",
+        "collaborator",
+        "follower",
+      ],
       customer_type: ["عميل حالي", "عميل جديد", "عميل محتمل"],
+      department_role: [
+        "department_manager",
+        "department_supervisor",
+        "team_leader",
+        "employee",
+        "viewer",
+      ],
       design_status: [
         "لم يبدأ",
         "قيد التنفيذ",
@@ -924,6 +1274,15 @@ export const Constants = {
         "بروشور وكتالوج",
         "شيتات 50×70",
         "أخرى",
+      ],
+      workflow_kind: [
+        "department",
+        "cross_department",
+        "request",
+        "approval",
+        "recurring",
+        "project",
+        "sales_to_design",
       ],
     },
   },

@@ -67,15 +67,19 @@ function StructurePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">إدارة السنوات والشهور والقوالب</h1>
-        <p className="text-sm text-muted-foreground">إدارة هيكل النظام وقوالب المهام لكل شهر.</p>
+        <h1 className="text-2xl font-bold">إدارة هيكل النظام</h1>
+        <p className="text-sm text-muted-foreground">الأقسام وأنواع المهام والسنوات والشهور وقوالب المهام.</p>
       </div>
-      <Tabs defaultValue="years" dir="rtl">
+      <Tabs defaultValue="departments" dir="rtl">
         <TabsList>
+          <TabsTrigger value="departments">الأقسام</TabsTrigger>
+          <TabsTrigger value="task-types">أنواع المهام</TabsTrigger>
           <TabsTrigger value="years">السنوات والشهور</TabsTrigger>
           <TabsTrigger value="templates">القوالب</TabsTrigger>
-          <TabsTrigger value="audit">سجل تعديلات الهيكل</TabsTrigger>
+          <TabsTrigger value="audit">سجل التعديلات</TabsTrigger>
         </TabsList>
+        <TabsContent value="departments" className="mt-4"><DepartmentsPanel /></TabsContent>
+        <TabsContent value="task-types" className="mt-4"><TaskTypesPanel /></TabsContent>
         <TabsContent value="years" className="mt-4"><YearsPanel /></TabsContent>
         <TabsContent value="templates" className="mt-4"><TemplatesPanel /></TabsContent>
         <TabsContent value="audit" className="mt-4"><AuditPanel /></TabsContent>
@@ -1180,5 +1184,689 @@ function StatusesEditorDialog({ template }: { template: any }) {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ============================================================
+// DEPARTMENTS PANEL (Phase 1)
+// ============================================================
+import {
+  listDepartments, createDepartment, updateDepartment, deleteDepartment,
+  listDepartmentMembers, addDepartmentMember, updateDepartmentMember, removeDepartmentMember,
+  listAssignableUsers, listTaskTypes, createTaskType, updateTaskType, deleteTaskType,
+  getDepartmentCapabilities,
+} from "@/lib/departments.functions";
+import { Building2, Users, Search, Palette, ClipboardList } from "lucide-react";
+
+const DEPT_ROLE_LABEL: Record<string,string> = {
+  department_manager:    "مدير قسم",
+  department_supervisor: "مشرف قسم",
+  team_leader:           "قائد فريق",
+  employee:              "موظف",
+  viewer:                "مشاهد فقط",
+};
+
+function DepartmentsPanel() {
+  const qc = useQueryClient();
+  const listFn = useServerFn(listDepartments);
+  const capsFn = useServerFn(getDepartmentCapabilities);
+  const { data: caps } = useQuery({ queryKey: ["dept-caps"], queryFn: () => capsFn() });
+  const { data: depts = [] } = useQuery({ queryKey: ["departments"], queryFn: () => listFn() });
+  const [search, setSearch] = useState("");
+  const [showArchived, setShowArchived] = useState(false);
+  const [openMembers, setOpenMembers] = useState<string | null>(null);
+  const [openEdit, setOpenEdit] = useState<any | null>(null);
+
+  const canManage = caps?.manage_departments === true;
+
+  const filtered = (depts as any[]).filter((d: any) => {
+    if (!showArchived && d.is_archived) return false;
+    if (search.trim() === "") return true;
+    const s = search.trim().toLowerCase();
+    return d.name_ar.toLowerCase().includes(s) ||
+           (d.name_en ?? "").toLowerCase().includes(s) ||
+           d.key.toLowerCase().includes(s);
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute right-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input value={search} onChange={(e) => setSearch(e.target.value)}
+                 placeholder="بحث عن قسم…" className="pr-8" />
+        </div>
+        <label className="flex items-center gap-2 text-sm">
+          <Checkbox checked={showArchived} onCheckedChange={(v) => setShowArchived(v === true)} />
+          إظهار المؤرشفة
+        </label>
+        {canManage && <NewDepartmentDialog />}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {filtered.length === 0 && (
+          <div className="col-span-full text-center py-10 text-muted-foreground">
+            لا توجد أقسام مطابقة.
+          </div>
+        )}
+        {filtered.map((d: any) => (
+          <Card key={d.id} className="card-soft">
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="h-10 w-10 rounded-lg flex items-center justify-center text-white font-bold"
+                       style={{ backgroundColor: d.color }}>
+                    {d.name_ar.charAt(0)}
+                  </div>
+                  <div>
+                    <div className="font-bold">{d.name_ar}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {d.name_en || d.key} · <code className="font-mono">{d.key}</code>
+                    </div>
+                  </div>
+                </div>
+                {d.is_archived && <Badge variant="secondary">مؤرشف</Badge>}
+              </div>
+
+              {d.description && (
+                <p className="text-sm text-muted-foreground line-clamp-2">{d.description}</p>
+              )}
+
+              <div className="flex flex-wrap gap-2 text-xs">
+                <Badge variant="outline"><Users className="h-3 w-3 ml-1" />{d.members_count} عضو</Badge>
+                <Badge variant="outline"><ClipboardList className="h-3 w-3 ml-1" />{d.tasks_count} تاسك</Badge>
+                <Badge variant="outline">ترتيب: {d.sort_order}</Badge>
+              </div>
+
+              <div className="flex flex-wrap gap-2 pt-2 border-t">
+                <Button size="sm" variant="outline" onClick={() => setOpenMembers(d.id)}>
+                  <Users className="h-3.5 w-3.5 ml-1" /> الأعضاء
+                </Button>
+                {canManage && (
+                  <>
+                    <Button size="sm" variant="outline" onClick={() => setOpenEdit(d)}>تعديل</Button>
+                    <ArchiveDeptButton dept={d} />
+                    <DeleteDeptButton dept={d} />
+                  </>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {openMembers && (
+        <DepartmentMembersDialog
+          departmentId={openMembers}
+          department={(depts as any[]).find((x: any) => x.id === openMembers)}
+          onClose={() => setOpenMembers(null)}
+          canManage={caps?.manage_department_members === true}
+        />
+      )}
+      {openEdit && (
+        <EditDepartmentDialog
+          dept={openEdit}
+          onClose={() => setOpenEdit(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function NewDepartmentDialog() {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({
+    key: "", name_ar: "", name_en: "", color: "#E30613",
+    icon: "Building2", description: "", sort_order: 100,
+  });
+  const createFn = useServerFn(createDepartment);
+  const mut = useMutation({
+    mutationFn: async () => createFn({ data: form as any }),
+    onSuccess: () => {
+      toast.success("تم إنشاء القسم");
+      qc.invalidateQueries({ queryKey: ["departments"] });
+      setOpen(false);
+      setForm({ key: "", name_ar: "", name_en: "", color: "#E30613", icon: "Building2", description: "", sort_order: 100 });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "فشل الإنشاء"),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button size="sm"><Plus className="h-4 w-4 ml-1" /> قسم جديد</Button>
+      </DialogTrigger>
+      <DialogContent dir="rtl">
+        <DialogHeader><DialogTitle>إنشاء قسم جديد</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <div>
+            <Label>الاسم بالعربية *</Label>
+            <Input value={form.name_ar} onChange={(e) => setForm({ ...form, name_ar: e.target.value })} />
+          </div>
+          <div>
+            <Label>الاسم بالإنجليزية</Label>
+            <Input value={form.name_en} onChange={(e) => setForm({ ...form, name_en: e.target.value })} />
+          </div>
+          <div>
+            <Label>المفتاح الفني *</Label>
+            <Input value={form.key} onChange={(e) => setForm({ ...form, key: e.target.value.toLowerCase() })}
+                   placeholder="marketing" className="font-mono" />
+            <p className="text-xs text-muted-foreground mt-1">حروف إنجليزية صغيرة وأرقام و _ فقط.</p>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>اللون</Label>
+              <Input type="color" value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} />
+            </div>
+            <div>
+              <Label>الترتيب</Label>
+              <Input type="number" value={form.sort_order}
+                     onChange={(e) => setForm({ ...form, sort_order: Number(e.target.value) })} />
+            </div>
+          </div>
+          <div>
+            <Label>وصف مختصر</Label>
+            <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>إلغاء</Button>
+          <Button onClick={() => mut.mutate()} disabled={mut.isPending || !form.name_ar || !form.key}>
+            إنشاء
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function EditDepartmentDialog({ dept, onClose }: { dept: any; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [form, setForm] = useState({
+    name_ar: dept.name_ar, name_en: dept.name_en ?? "",
+    color: dept.color, icon: dept.icon,
+    description: dept.description ?? "", sort_order: dept.sort_order,
+  });
+  const updateFn = useServerFn(updateDepartment);
+  const mut = useMutation({
+    mutationFn: async () => updateFn({ data: { id: dept.id, patch: form } as any }),
+    onSuccess: () => {
+      toast.success("تم الحفظ");
+      qc.invalidateQueries({ queryKey: ["departments"] });
+      onClose();
+    },
+    onError: (e: any) => toast.error(e?.message ?? "فشل الحفظ"),
+  });
+
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent dir="rtl">
+        <DialogHeader><DialogTitle>تعديل القسم — {dept.name_ar}</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <div>
+            <Label>الاسم بالعربية</Label>
+            <Input value={form.name_ar} onChange={(e) => setForm({ ...form, name_ar: e.target.value })} />
+          </div>
+          <div>
+            <Label>الاسم بالإنجليزية</Label>
+            <Input value={form.name_en} onChange={(e) => setForm({ ...form, name_en: e.target.value })} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>اللون</Label>
+              <Input type="color" value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} />
+            </div>
+            <div>
+              <Label>الترتيب</Label>
+              <Input type="number" value={form.sort_order}
+                     onChange={(e) => setForm({ ...form, sort_order: Number(e.target.value) })} />
+            </div>
+          </div>
+          <div>
+            <Label>وصف مختصر</Label>
+            <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+          </div>
+          <p className="text-xs text-muted-foreground">المفتاح الفني <code>{dept.key}</code> لا يمكن تغييره.</p>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>إلغاء</Button>
+          <Button onClick={() => mut.mutate()} disabled={mut.isPending}>حفظ</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ArchiveDeptButton({ dept }: { dept: any }) {
+  const qc = useQueryClient();
+  const updateFn = useServerFn(updateDepartment);
+  const mut = useMutation({
+    mutationFn: async () => updateFn({ data: { id: dept.id, patch: { is_archived: !dept.is_archived } } as any }),
+    onSuccess: () => {
+      toast.success(dept.is_archived ? "تم استرجاع القسم" : "تم أرشفة القسم");
+      qc.invalidateQueries({ queryKey: ["departments"] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "فشل"),
+  });
+  return (
+    <Button size="sm" variant="outline" onClick={() => mut.mutate()} disabled={mut.isPending}>
+      {dept.is_archived ? <><ArchiveRestore className="h-3.5 w-3.5 ml-1" />استرجاع</>
+                        : <><Archive className="h-3.5 w-3.5 ml-1" />أرشفة</>}
+    </Button>
+  );
+}
+
+function DeleteDeptButton({ dept }: { dept: any }) {
+  const qc = useQueryClient();
+  const delFn = useServerFn(deleteDepartment);
+  const mut = useMutation({
+    mutationFn: async () => delFn({ data: { id: dept.id } }),
+    onSuccess: () => {
+      toast.success("تم الحذف");
+      qc.invalidateQueries({ queryKey: ["departments"] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "لا يمكن الحذف"),
+  });
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <Button size="sm" variant="outline" className="text-destructive">
+          <Trash2 className="h-3.5 w-3.5 ml-1" />حذف
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent dir="rtl">
+        <AlertDialogHeader>
+          <AlertDialogTitle>حذف القسم "{dept.name_ar}"؟</AlertDialogTitle>
+          <AlertDialogDescription>
+            سيفشل الحذف إن كان القسم يحتوي على أعضاء أو تاسكات. يمكنك أرشفته بدلًا من ذلك.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>إلغاء</AlertDialogCancel>
+          <AlertDialogAction onClick={() => mut.mutate()}>حذف</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+function DepartmentMembersDialog({
+  departmentId, department, onClose, canManage,
+}: { departmentId: string; department: any; onClose: () => void; canManage: boolean }) {
+  const qc = useQueryClient();
+  const listFn = useServerFn(listDepartmentMembers);
+  const usersFn = useServerFn(listAssignableUsers);
+  const addFn = useServerFn(addDepartmentMember);
+  const updFn = useServerFn(updateDepartmentMember);
+  const rmFn  = useServerFn(removeDepartmentMember);
+
+  const { data: members = [] } = useQuery({
+    queryKey: ["dept-members", departmentId],
+    queryFn: () => listFn({ data: { department_id: departmentId } }),
+  });
+  const { data: users = [] } = useQuery({
+    queryKey: ["assignable-users"], queryFn: () => usersFn(),
+    enabled: canManage,
+  });
+
+  const memberUserIds = new Set((members as any[]).map((m: any) => m.user_id));
+  const [pickUser, setPickUser] = useState("");
+  const [pickRole, setPickRole] = useState<string>("employee");
+
+  const addMut = useMutation({
+    mutationFn: async () => addFn({ data: { department_id: departmentId, user_id: pickUser, role: pickRole as any, is_primary: false } as any }),
+    onSuccess: () => {
+      toast.success("تمت الإضافة");
+      qc.invalidateQueries({ queryKey: ["dept-members", departmentId] });
+      qc.invalidateQueries({ queryKey: ["departments"] });
+      setPickUser("");
+    },
+    onError: (e: any) => toast.error(e?.message ?? "فشل"),
+  });
+
+  const updMut = useMutation({
+    mutationFn: async ({ id, patch }: any) => updFn({ data: { id, patch } as any }),
+    onSuccess: () => {
+      toast.success("تم التحديث");
+      qc.invalidateQueries({ queryKey: ["dept-members", departmentId] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "فشل"),
+  });
+
+  const rmMut = useMutation({
+    mutationFn: async (id: string) => rmFn({ data: { id } }),
+    onSuccess: () => {
+      toast.success("تم الحذف");
+      qc.invalidateQueries({ queryKey: ["dept-members", departmentId] });
+      qc.invalidateQueries({ queryKey: ["departments"] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "فشل"),
+  });
+
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent dir="rtl" className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>أعضاء قسم "{department?.name_ar}"</DialogTitle>
+        </DialogHeader>
+
+        {canManage && (
+          <div className="flex flex-wrap gap-2 items-end p-3 bg-muted/40 rounded-md">
+            <div className="flex-1 min-w-[200px]">
+              <Label className="text-xs">المستخدم</Label>
+              <Select value={pickUser} onValueChange={setPickUser}>
+                <SelectTrigger><SelectValue placeholder="اختر مستخدم…" /></SelectTrigger>
+                <SelectContent>
+                  {(users as any[]).filter((u: any) => !memberUserIds.has(u.id)).map((u: any) => (
+                    <SelectItem key={u.id} value={u.id}>{u.full_name} — {u.email}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="w-40">
+              <Label className="text-xs">الدور</Label>
+              <Select value={pickRole} onValueChange={setPickRole}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {Object.entries(DEPT_ROLE_LABEL).map(([k, v]) => (
+                    <SelectItem key={k} value={k}>{v}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button onClick={() => addMut.mutate()} disabled={!pickUser || addMut.isPending}>
+              <Plus className="h-4 w-4 ml-1" /> إضافة
+            </Button>
+          </div>
+        )}
+
+        <div className="space-y-2 max-h-[400px] overflow-auto">
+          {(members as any[]).length === 0 && (
+            <div className="text-sm text-muted-foreground text-center py-6">لا يوجد أعضاء بعد.</div>
+          )}
+          {(members as any[]).map((m: any) => (
+            <div key={m.id} className="flex items-center justify-between p-2 border rounded">
+              <div>
+                <div className="font-medium">{m.profiles?.full_name ?? "—"}</div>
+                <div className="text-xs text-muted-foreground">{m.profiles?.email}</div>
+              </div>
+              <div className="flex items-center gap-2">
+                {canManage ? (
+                  <Select value={m.role}
+                          onValueChange={(v) => updMut.mutate({ id: m.id, patch: { role: v } })}>
+                    <SelectTrigger className="w-36 h-8"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(DEPT_ROLE_LABEL).map(([k, v]) => (
+                        <SelectItem key={k} value={k}>{v}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Badge variant="secondary">{DEPT_ROLE_LABEL[m.role] ?? m.role}</Badge>
+                )}
+                {!m.active && <Badge variant="outline">غير نشط</Badge>}
+                {canManage && (
+                  <Button size="sm" variant="ghost" className="text-destructive"
+                          onClick={() => rmMut.mutate(m.id)}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>إغلاق</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ============================================================
+// TASK TYPES PANEL (Phase 1)
+// ============================================================
+function TaskTypesPanel() {
+  const qc = useQueryClient();
+  const listFn = useServerFn(listTaskTypes);
+  const deptFn = useServerFn(listDepartments);
+  const capsFn = useServerFn(getDepartmentCapabilities);
+  const { data: caps } = useQuery({ queryKey: ["dept-caps"], queryFn: () => capsFn() });
+  const { data: types = [] } = useQuery({ queryKey: ["task-types"], queryFn: () => listFn() });
+  const { data: depts = [] } = useQuery({ queryKey: ["departments"], queryFn: () => deptFn() });
+  const [openEdit, setOpenEdit] = useState<any | null>(null);
+  const canManage = caps?.manage_task_types === true;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="font-bold">أنواع المهام</h3>
+        {canManage && <NewTaskTypeDialog depts={depts as any[]} />}
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {(types as any[]).length === 0 && (
+          <div className="col-span-full text-center py-10 text-muted-foreground">
+            لا توجد أنواع مهام بعد.
+          </div>
+        )}
+        {(types as any[]).map((t: any) => (
+          <Card key={t.id} className="card-soft">
+            <CardContent className="p-4 space-y-2">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="h-9 w-9 rounded flex items-center justify-center text-white"
+                       style={{ backgroundColor: t.color }}>
+                    <ClipboardList className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <div className="font-bold">{t.name_ar}</div>
+                    <div className="text-xs text-muted-foreground font-mono">{t.key}</div>
+                  </div>
+                </div>
+                {t.is_archived && <Badge variant="secondary">مؤرشف</Badge>}
+              </div>
+              <div className="flex flex-wrap gap-1 text-xs">
+                {t.departments && (
+                  <Badge variant="outline" style={{ borderColor: t.departments.color }}>
+                    {t.departments.name_ar}
+                  </Badge>
+                )}
+                {t.code_prefix && <Badge variant="outline">{t.code_prefix}</Badge>}
+                <Badge variant="outline">{t.default_priority}</Badge>
+                {t.default_sla_hours && <Badge variant="outline">SLA {t.default_sla_hours}س</Badge>}
+              </div>
+              {canManage && (
+                <div className="flex gap-2 pt-2 border-t">
+                  <Button size="sm" variant="outline" onClick={() => setOpenEdit(t)}>تعديل</Button>
+                  <DeleteTaskTypeButton tt={t} />
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+      {openEdit && (
+        <EditTaskTypeDialog tt={openEdit} depts={depts as any[]} onClose={() => setOpenEdit(null)} />
+      )}
+    </div>
+  );
+}
+
+function taskTypeForm(defaults: any = {}) {
+  return {
+    key: "", name_ar: "", name_en: "", color: "#FF5A2C", icon: "ClipboardList",
+    description: "", department_id: null as string | null, code_prefix: "",
+    default_priority: "عادية", default_sla_hours: null as number | null,
+    sort_order: 100, ...defaults,
+  };
+}
+
+function TaskTypeFormFields({ form, setForm, depts }: any) {
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <Label>الاسم بالعربية *</Label>
+          <Input value={form.name_ar} onChange={(e) => setForm({ ...form, name_ar: e.target.value })} />
+        </div>
+        <div>
+          <Label>الاسم بالإنجليزية</Label>
+          <Input value={form.name_en} onChange={(e) => setForm({ ...form, name_en: e.target.value })} />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <Label>المفتاح *</Label>
+          <Input value={form.key} onChange={(e) => setForm({ ...form, key: e.target.value.toLowerCase() })}
+                 className="font-mono" placeholder="content_plan" />
+        </div>
+        <div>
+          <Label>كود التاسك (Prefix)</Label>
+          <Input value={form.code_prefix ?? ""}
+                 onChange={(e) => setForm({ ...form, code_prefix: e.target.value.toUpperCase() })}
+                 className="font-mono" placeholder="MKT" />
+        </div>
+      </div>
+      <div>
+        <Label>القسم</Label>
+        <Select value={form.department_id ?? "__none"}
+                onValueChange={(v) => setForm({ ...form, department_id: v === "__none" ? null : v })}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__none">عام (كل الأقسام)</SelectItem>
+            {(depts as any[]).map((d: any) => (
+              <SelectItem key={d.id} value={d.id}>{d.name_ar}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="grid grid-cols-3 gap-3">
+        <div>
+          <Label>اللون</Label>
+          <Input type="color" value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} />
+        </div>
+        <div>
+          <Label>الأولوية</Label>
+          <Select value={form.default_priority}
+                  onValueChange={(v) => setForm({ ...form, default_priority: v })}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {["عاجل","عالية","متوسطة","عادية"].map((p) => (
+                <SelectItem key={p} value={p}>{p}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label>SLA (ساعات)</Label>
+          <Input type="number" value={form.default_sla_hours ?? ""}
+                 onChange={(e) => setForm({ ...form, default_sla_hours: e.target.value ? Number(e.target.value) : null })} />
+        </div>
+      </div>
+      <div>
+        <Label>وصف مختصر</Label>
+        <Textarea value={form.description ?? ""}
+                  onChange={(e) => setForm({ ...form, description: e.target.value })} />
+      </div>
+    </div>
+  );
+}
+
+function NewTaskTypeDialog({ depts }: { depts: any[] }) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState<any>(taskTypeForm());
+  const createFn = useServerFn(createTaskType);
+  const mut = useMutation({
+    mutationFn: async () => createFn({ data: form as any }),
+    onSuccess: () => {
+      toast.success("تم الإنشاء");
+      qc.invalidateQueries({ queryKey: ["task-types"] });
+      setOpen(false); setForm(taskTypeForm());
+    },
+    onError: (e: any) => toast.error(e?.message ?? "فشل"),
+  });
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button size="sm"><Plus className="h-4 w-4 ml-1" />نوع مهمة جديد</Button>
+      </DialogTrigger>
+      <DialogContent dir="rtl">
+        <DialogHeader><DialogTitle>نوع مهمة جديد</DialogTitle></DialogHeader>
+        <TaskTypeFormFields form={form} setForm={setForm} depts={depts} />
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>إلغاء</Button>
+          <Button onClick={() => mut.mutate()} disabled={!form.name_ar || !form.key || mut.isPending}>إنشاء</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function EditTaskTypeDialog({ tt, depts, onClose }: { tt: any; depts: any[]; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [form, setForm] = useState<any>(taskTypeForm(tt));
+  const updateFn = useServerFn(updateTaskType);
+  const mut = useMutation({
+    mutationFn: async () => updateFn({ data: { id: tt.id, patch: form } as any }),
+    onSuccess: () => {
+      toast.success("تم الحفظ");
+      qc.invalidateQueries({ queryKey: ["task-types"] });
+      onClose();
+    },
+    onError: (e: any) => toast.error(e?.message ?? "فشل"),
+  });
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent dir="rtl">
+        <DialogHeader><DialogTitle>تعديل — {tt.name_ar}</DialogTitle></DialogHeader>
+        <TaskTypeFormFields form={form} setForm={setForm} depts={depts} />
+        <div className="flex items-center gap-2 pt-2">
+          <Checkbox checked={form.is_archived === true}
+                    onCheckedChange={(v) => setForm({ ...form, is_archived: v === true })} />
+          <Label>مؤرشف</Label>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>إلغاء</Button>
+          <Button onClick={() => mut.mutate()} disabled={mut.isPending}>حفظ</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DeleteTaskTypeButton({ tt }: { tt: any }) {
+  const qc = useQueryClient();
+  const delFn = useServerFn(deleteTaskType);
+  const mut = useMutation({
+    mutationFn: async () => delFn({ data: { id: tt.id } }),
+    onSuccess: () => {
+      toast.success("تم الحذف");
+      qc.invalidateQueries({ queryKey: ["task-types"] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "لا يمكن الحذف"),
+  });
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <Button size="sm" variant="outline" className="text-destructive">
+          <Trash2 className="h-3.5 w-3.5 ml-1" />حذف
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent dir="rtl">
+        <AlertDialogHeader>
+          <AlertDialogTitle>حذف "{tt.name_ar}"؟</AlertDialogTitle>
+          <AlertDialogDescription>
+            سيفشل الحذف إن كان النوع مستخدمًا في تاسكات. أرشفه بدلًا من ذلك.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>إلغاء</AlertDialogCancel>
+          <AlertDialogAction onClick={() => mut.mutate()}>حذف</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
