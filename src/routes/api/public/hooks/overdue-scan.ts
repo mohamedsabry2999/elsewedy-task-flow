@@ -16,12 +16,6 @@ function rateLimit(ip: string, limit = 6, windowMs = 60_000): boolean {
   return true;
 }
 
-function safeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
-}
 
 const REMINDER_STAGES = [
   { key: "due_24h", hours: 24, title: "تذكير: التسليم بعد 24 ساعة", severity: "normal" as const },

@@ -27,3 +27,27 @@ npm run dev
 - TypeScript
 - React
 - Tailwind CSS
+
+## Overdue Scan Cron
+
+The endpoint `POST /api/public/hooks/overdue-scan` generates upcoming-delivery
+reminders (24h / 4h / 1h) and overdue notifications. It requires a Bearer
+token stored in Supabase Vault under the name `OVERDUE_SCAN_SECRET`.
+
+- The token is generated automatically the first time the migration runs
+  (random 48-byte hex) and never leaves the database.
+- The endpoint validates each request by calling the security-definer
+  function `public.verify_overdue_scan_secret(_token)`, which reads the
+  value from `vault.decrypted_secrets` and does a constant-time compare.
+- The `pg_cron` job `elsewedy-overdue-scan` runs every hour at minute 0 and
+  posts to the endpoint with `Authorization: Bearer <vault secret>`.
+- No frontend or public env var ever holds the secret.
+
+To rotate the secret, delete the row in `vault.secrets` where
+`name = 'OVERDUE_SCAN_SECRET'` and re-run the migration — a fresh value
+will be generated and the cron will keep working (it reads from Vault at
+call time).
+
+All delivery deadlines are computed in the `Africa/Cairo` timezone via the
+`set_task_due_at` trigger, which combines `delivery_due_date` and
+`delivery_due_time`.
