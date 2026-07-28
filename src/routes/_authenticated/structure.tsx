@@ -543,10 +543,13 @@ function TemplatesPanel() {
                     {t.description && <div className="text-xs text-muted-foreground mt-1">{t.description}</div>}
                   </div>
                   <div className="flex gap-1">
+                    <ColumnsEditorDialog template={t} />
                     <EditTemplateDialog template={t} />
                     <Button size="sm" variant="outline"
                       onClick={() => upd.mutate({ id: t.id, patch: { is_system_default: true } })}
                       disabled={t.is_system_default}>
+                      <Star className="h-3.5 w-3.5" />
+                    </Button>
                       <Star className="h-3.5 w-3.5" />
                     </Button>
                     <AlertDialog>
