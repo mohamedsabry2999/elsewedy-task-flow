@@ -319,52 +319,56 @@ function MonthsList({ yearId }: { yearId: string }) {
         </div>
       )}
       {months.map((m: any) => (
-        <div key={m.id} className="rounded-lg border p-3 flex flex-wrap items-center gap-3">
-          <div className="w-10 text-center font-bold text-lg text-muted-foreground">{String(m.month_num).padStart(2, "0")}</div>
-          <div className="flex-1 min-w-[160px]">
-            <div className="flex items-center gap-2">
-              <span className="font-medium">{m.emoji ?? ""}</span>
-              <span className="font-medium">{m.name_ar}</span>
-              {m.is_default && <Badge className="bg-emerald-100 text-emerald-800">افتراضي</Badge>}
-              {m.is_archived && <Badge variant="outline">مؤرشف</Badge>}
-              {m.is_hidden && <Badge variant="outline">مخفي</Badge>}
-              {m.month_code && <Badge variant="secondary" className="font-mono">{m.month_code}</Badge>}
+        <div key={m.id} className="rounded-lg border p-3 space-y-2">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="w-10 text-center font-bold text-lg text-muted-foreground">{String(m.month_num).padStart(2, "0")}</div>
+            <div className="flex-1 min-w-[160px]">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-medium">{m.emoji ?? ""}</span>
+                <span className="font-medium">{m.name_ar}</span>
+                {m.is_default && <Badge className="bg-emerald-100 text-emerald-800">افتراضي</Badge>}
+                {m.is_archived && <Badge variant="outline">مؤرشف</Badge>}
+                {m.is_hidden && <Badge variant="outline">مخفي</Badge>}
+                {m.month_code && <Badge variant="secondary" className="font-mono">{m.month_code}</Badge>}
+              </div>
+            </div>
+            <div className="flex gap-1">
+              <Button size="sm" variant="outline" onClick={() => upd.mutate({ id: m.id, patch: { is_default: true } })} disabled={m.is_default}>
+                <Star className="h-3.5 w-3.5" />
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => upd.mutate({ id: m.id, patch: { is_hidden: !m.is_hidden } })}>
+                {m.is_hidden ? "إظهار" : "إخفاء"}
+              </Button>
+              {m.is_archived ? (
+                <Button size="sm" variant="outline" onClick={() => upd.mutate({ id: m.id, patch: { is_archived: false } })}>
+                  <ArchiveRestore className="h-3.5 w-3.5" />
+                </Button>
+              ) : (
+                <Button size="sm" variant="outline" onClick={() => upd.mutate({ id: m.id, patch: { is_archived: true } })}>
+                  <Archive className="h-3.5 w-3.5" />
+                </Button>
+              )}
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button size="sm" variant="ghost" className="text-red-600"><Trash2 className="h-3.5 w-3.5" /></Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>حذف {m.name_ar}؟</AlertDialogTitle>
+                    <AlertDialogDescription>لا يمكن الحذف إذا كان الشهر يحتوي على تاسكات. يمكن أرشفته بدلًا من ذلك.</AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                    <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={() => del.mutate(m.id)}>حذف</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           </div>
-          <div className="flex gap-1">
-            <Button size="sm" variant="outline" onClick={() => upd.mutate({ id: m.id, patch: { is_default: true } })} disabled={m.is_default}>
-              <Star className="h-3.5 w-3.5" />
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => upd.mutate({ id: m.id, patch: { is_hidden: !m.is_hidden } })}>
-              {m.is_hidden ? "إظهار" : "إخفاء"}
-            </Button>
-            {m.is_archived ? (
-              <Button size="sm" variant="outline" onClick={() => upd.mutate({ id: m.id, patch: { is_archived: false } })}>
-                <ArchiveRestore className="h-3.5 w-3.5" />
-              </Button>
-            ) : (
-              <Button size="sm" variant="outline" onClick={() => upd.mutate({ id: m.id, patch: { is_archived: true } })}>
-                <Archive className="h-3.5 w-3.5" />
-              </Button>
-            )}
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button size="sm" variant="ghost" className="text-red-600"><Trash2 className="h-3.5 w-3.5" /></Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>حذف {m.name_ar}؟</AlertDialogTitle>
-                  <AlertDialogDescription>لا يمكن الحذف إذا كان الشهر يحتوي على تاسكات. يمكن أرشفته بدلًا من ذلك.</AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                  <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={() => del.mutate(m.id)}>حذف</AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
+          <MonthTemplateSelect monthId={m.id} currentTemplateId={m.template_id} />
         </div>
       ))}
+
     </div>
   );
 }
