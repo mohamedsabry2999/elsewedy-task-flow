@@ -67,8 +67,15 @@ export const createTask = createServerFn({ method: "POST" })
 
 export const updateTask = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { id: string; patch: Record<string, unknown> }) => d)
+  .inputValidator((d: { id: string; patch: Record<string, unknown>; expected_updated_at?: string | null }) => d)
   .handler(async ({ data, context }) => {
+    if (data.expected_updated_at) {
+      const { data: cur } = await context.supabase
+        .from("tasks").select("updated_at").eq("id", data.id).maybeSingle();
+      if (cur && cur.updated_at && cur.updated_at !== data.expected_updated_at) {
+        throw new Error("تعارض في التعديل: قام مستخدم آخر بتعديل هذا التاسك. حدّث الصفحة وحاول مجددًا.");
+      }
+    }
     const { data: row, error } = await context.supabase
       .from("tasks").update(data.patch as any).eq("id", data.id).select().single();
     if (error) throw new Error(error.message);
