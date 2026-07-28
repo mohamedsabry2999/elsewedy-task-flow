@@ -489,6 +489,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_view_task: {
+        Args: { _task_id: string; _user_id: string }
+        Returns: boolean
+      }
       has_any_role: {
         Args: {
           _roles: Database["public"]["Enums"]["app_role"][]
