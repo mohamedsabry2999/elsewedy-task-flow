@@ -927,9 +927,25 @@ function FullEditDialog({
                   <Input type="date" value={form.design_start_date ?? ""} disabled={!canEdit("design_start_date")}
                     onChange={(e) => upd("design_start_date", e.target.value || null)} />
                 </MiniField>
-                <MiniField label="موعد التسليم">
+                <MiniField label="تاريخ التسليم">
                   <Input type="date" value={form.delivery_due_date ?? ""} disabled={!canEdit("delivery_due_date")}
                     onChange={(e) => upd("delivery_due_date", e.target.value || null)} />
+                </MiniField>
+                <MiniField label="وقت التسليم">
+                  <Input type="time" value={form.delivery_due_time ?? ""} disabled={!canEdit("delivery_due_date")}
+                    onChange={(e) => upd("delivery_due_time", e.target.value || null)} />
+                </MiniField>
+                <MiniField label="سبب الإيقاف">
+                  <Textarea value={form.stop_reason ?? ""}
+                    onChange={(e) => upd("stop_reason", e.target.value || null)} />
+                </MiniField>
+                <MiniField label="ملاحظة التعديل">
+                  <Textarea value={form.revision_note ?? ""}
+                    onChange={(e) => upd("revision_note", e.target.value || null)} />
+                </MiniField>
+                <MiniField label="سبب إعادة الفتح">
+                  <Textarea value={form.reopen_note ?? ""}
+                    onChange={(e) => upd("reopen_note", e.target.value || null)} />
                 </MiniField>
               </div>
               <MiniField label="رابط الملفات">
