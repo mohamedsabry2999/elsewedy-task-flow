@@ -544,6 +544,8 @@ function TemplatesPanel() {
                   </div>
                   <div className="flex gap-1">
                     <ColumnsEditorDialog template={t} />
+                    <FieldsEditorDialog template={t} />
+                    <StatusesEditorDialog template={t} />
                     <EditTemplateDialog template={t} />
                     <Button size="sm" variant="outline"
                       onClick={() => upd.mutate({ id: t.id, patch: { is_system_default: true } })}
