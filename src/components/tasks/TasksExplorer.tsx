@@ -22,7 +22,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { formatDate, toCSV, downloadCSV, isOverdue } from "@/lib/format";
+import { formatDate, formatDueDateTime, toCSV, downloadCSV, isOverdue } from "@/lib/format";
 import { Archive, ArchiveRestore, Columns, Download, Filter, Search, Trash2, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { TaskDetailDrawer } from "@/components/tasks/TaskDetailDrawer";

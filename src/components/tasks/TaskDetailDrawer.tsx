@@ -30,7 +30,7 @@ import {
   OVERALL_STATUS, DESIGN_STATUS, PRIORITY, CUSTOMER_TYPE, PRODUCT_SERVICE,
   SALES_CHECKLIST_ITEMS, DESIGN_CHECKLIST_ITEMS, STATUS_COLOR, PRIORITY_COLOR,
 } from "@/lib/i18n";
-import { formatDate, formatDateTime, isOverdue } from "@/lib/format";
+import { formatDate, formatDateTime, formatDueDateTime, isOverdue } from "@/lib/format";
 import { canEditTaskField, isAdminRole } from "@/lib/permissions";
 import { toast } from "sonner";
 import {
@@ -138,7 +138,7 @@ export function TaskDetailDrawer({ taskId, open, onClose }: { taskId: string | n
                 <div>العميل: <span className="text-foreground">{task.customer_name || "—"}</span></div>
                 <div>السيلز: <span className="text-foreground">{nameById.get(task.sales_owner_id ?? "") ?? "—"}</span></div>
                 <div>المصمم: <span className="text-foreground">{nameById.get(task.designer_id ?? "") ?? "—"}</span></div>
-                <div>التسليم: <span className="text-foreground">{formatDate(task.delivery_due_date)}</span></div>
+                <div>التسليم: <span className="text-foreground">{formatDueDateTime(task.delivery_due_date, task.delivery_due_time)}</span></div>
                 <div className="col-span-2">آخر تحديث: {formatDateTime(task.updated_at)}</div>
               </div>
             </SheetHeader>
