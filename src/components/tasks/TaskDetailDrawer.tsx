@@ -623,6 +623,10 @@ function QuickUpdateDialog({ task, profiles, onClose }: { task: any; profiles: a
     sales_owner_id: task.sales_owner_id ?? "",
     designer_id: task.designer_id ?? "",
     delivery_due_date: task.delivery_due_date ?? "",
+    delivery_due_time: task.delivery_due_time ?? "",
+    stop_reason: task.stop_reason ?? "",
+    revision_note: task.revision_note ?? "",
+    reopen_note: task.reopen_note ?? "",
     note: "",
   });
   const diff = useMemo(() => {
@@ -631,6 +635,9 @@ function QuickUpdateDialog({ task, profiles, onClose }: { task: any; profiles: a
       overall_status: task.overall_status, design_status: task.design_status,
       priority: task.priority, sales_owner_id: task.sales_owner_id ?? "",
       designer_id: task.designer_id ?? "", delivery_due_date: task.delivery_due_date ?? "",
+      delivery_due_time: task.delivery_due_time ?? "",
+      stop_reason: task.stop_reason ?? "", revision_note: task.revision_note ?? "",
+      reopen_note: task.reopen_note ?? "",
     };
     for (const k of Object.keys(map)) {
       if ((form as any)[k] !== map[k]) d[k] = [map[k], (form as any)[k]];
@@ -638,13 +645,23 @@ function QuickUpdateDialog({ task, profiles, onClose }: { task: any; profiles: a
     return d;
   }, [form, task]);
 
+  const needsStopReason = form.overall_status === "متوقف" && !form.stop_reason.trim();
+  const needsRevisionNote = form.overall_status === "تعديلات" && !form.revision_note.trim();
+  const isReopen = task.overall_status === "مكتمل" && form.overall_status !== "مكتمل";
+  const needsReopenNote = isReopen && !form.reopen_note.trim();
+
   const submit = useMutation({
     mutationFn: () => {
       const patch: Record<string, any> = {};
       for (const k of Object.keys(diff)) {
-        patch[k] = k.endsWith("_id") || k === "delivery_due_date" ? (diff[k][1] || null) : diff[k][1];
+        const nullable = k.endsWith("_id") || k === "delivery_due_date" || k === "delivery_due_time";
+        patch[k] = nullable ? (diff[k][1] || null) : diff[k][1];
       }
-      return quickFn({ data: { id: task.id, patch, note: form.note.trim() || undefined } });
+      return quickFn({ data: {
+        id: task.id, patch,
+        note: form.note.trim() || undefined,
+        expected_updated_at: task.updated_at ?? undefined,
+      } });
     },
     onSuccess: () => {
       toast.success("تم التحديث");
