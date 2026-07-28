@@ -14,6 +14,71 @@ export type Database = {
   }
   public: {
     Tables: {
+      months: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          emoji: string | null
+          id: string
+          is_archived: boolean
+          is_default: boolean
+          is_hidden: boolean
+          line: string | null
+          month_code: string | null
+          month_num: number
+          name_ar: string
+          slug: string | null
+          updated_at: string
+          verse: string | null
+          verse_ref: string | null
+          year_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          emoji?: string | null
+          id?: string
+          is_archived?: boolean
+          is_default?: boolean
+          is_hidden?: boolean
+          line?: string | null
+          month_code?: string | null
+          month_num: number
+          name_ar: string
+          slug?: string | null
+          updated_at?: string
+          verse?: string | null
+          verse_ref?: string | null
+          year_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          emoji?: string | null
+          id?: string
+          is_archived?: boolean
+          is_default?: boolean
+          is_hidden?: boolean
+          line?: string | null
+          month_code?: string | null
+          month_num?: number
+          name_ar?: string
+          slug?: string | null
+          updated_at?: string
+          verse?: string | null
+          verse_ref?: string | null
+          year_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "months_year_id_fkey"
+            columns: ["year_id"]
+            isOneToOne: false
+            referencedRelation: "years"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notification_preferences: {
         Row: {
           created_at: string
@@ -183,6 +248,42 @@ export type Database = {
         }
         Relationships: []
       }
+      structure_audit_log: {
+        Row: {
+          action: string
+          actor_id: string | null
+          after: Json | null
+          before: Json | null
+          created_at: string
+          details: Json
+          entity_id: string | null
+          entity_type: string
+          id: string
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          after?: Json | null
+          before?: Json | null
+          created_at?: string
+          details?: Json
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          after?: Json | null
+          before?: Json | null
+          created_at?: string
+          details?: Json
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+        }
+        Relationships: []
+      }
       task_activity: {
         Row: {
           action: string
@@ -340,6 +441,7 @@ export type Database = {
           is_archived: boolean
           is_demo: boolean
           month_code: string
+          month_id: string | null
           order_details: string | null
           overall_status: Database["public"]["Enums"]["overall_status"]
           priority: Database["public"]["Enums"]["priority"]
@@ -379,6 +481,7 @@ export type Database = {
           is_archived?: boolean
           is_demo?: boolean
           month_code: string
+          month_id?: string | null
           order_details?: string | null
           overall_status?: Database["public"]["Enums"]["overall_status"]
           priority?: Database["public"]["Enums"]["priority"]
@@ -418,6 +521,7 @@ export type Database = {
           is_archived?: boolean
           is_demo?: boolean
           month_code?: string
+          month_id?: string | null
           order_details?: string | null
           overall_status?: Database["public"]["Enums"]["overall_status"]
           priority?: Database["public"]["Enums"]["priority"]
@@ -434,7 +538,15 @@ export type Database = {
           task_name?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "tasks_month_id_fkey"
+            columns: ["month_id"]
+            isOneToOne: false
+            referencedRelation: "months"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_permission_overrides: {
         Row: {
@@ -484,11 +596,48 @@ export type Database = {
         }
         Relationships: []
       }
+      years: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          is_archived: boolean
+          is_default: boolean
+          sort_desc: boolean
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          is_archived?: boolean
+          is_default?: boolean
+          sort_desc?: boolean
+          updated_at?: string
+          year: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          is_archived?: boolean
+          is_default?: boolean
+          sort_desc?: boolean
+          updated_at?: string
+          year?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      can_manage_structure: { Args: { _user_id: string }; Returns: boolean }
       can_view_task: {
         Args: { _task_id: string; _user_id: string }
         Returns: boolean

@@ -3,11 +3,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { myRoles, listNotifications, markNotificationRead, markAllNotificationsRead, getNotificationPrefs } from "@/lib/tasks.functions";
+import { listNavMonths, canManageStructure } from "@/lib/structure.functions";
 import { ROLE_LABEL, MONTHS, type AppRole } from "@/lib/i18n";
 import { useEffect, useRef, useState } from "react";
 import {
-  LayoutDashboard, ListTodo, Calendar, ShieldCheck, History, Settings, LogOut, Bell, Menu, Volume2, VolumeX, CheckCheck, ExternalLink, X,
+  LayoutDashboard, ListTodo, Calendar, ShieldCheck, History, Settings, LogOut, Bell, Menu, Volume2, VolumeX, CheckCheck, ExternalLink, X, SlidersHorizontal,
 } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuLabel,
@@ -82,6 +84,25 @@ function AuthLayout() {
 
 function SidebarBody({ roles, onNavigate }: { roles: string[]; onNavigate: () => void }) {
   const location = useLocation();
+  const navMonthsFn = useServerFn(listNavMonths);
+  const canStructFn = useServerFn(canManageStructure);
+  const { data: navData } = useQuery({
+    queryKey: ["nav-months"], queryFn: () => navMonthsFn(), staleTime: 60_000,
+  });
+  const { data: canStruct = false } = useQuery({
+    queryKey: ["can-manage-structure"], queryFn: () => canStructFn(),
+  });
+
+  // Fallback to legacy MONTHS if DB is empty (should not happen after migration).
+  const years = navData?.years ?? [];
+  const months = navData?.months ?? [];
+  const monthsByYear = new Map<string, any[]>();
+  months.forEach((m: any) => {
+    const arr = monthsByYear.get(m.year_id) ?? [];
+    arr.push(m); monthsByYear.set(m.year_id, arr);
+  });
+  const useLegacy = years.length === 0 || months.length === 0;
+
   return (
     <>
       <Link to="/dashboard" onClick={onNavigate} className="flex items-center justify-center px-2 py-3 border-b border-sidebar-border/60">
@@ -103,27 +124,67 @@ function SidebarBody({ roles, onNavigate }: { roles: string[]; onNavigate: () =>
             </Link>
           );
         })}
+        {canStruct && (
+          <Link to="/structure" onClick={onNavigate}
+            className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition ${
+              location.pathname.startsWith("/structure") ? "bg-primary/10 text-primary font-semibold" : "hover:bg-sidebar-accent"
+            }`}>
+            <SlidersHorizontal className="h-4 w-4" />
+            <span>إدارة السنوات والشهور</span>
+          </Link>
+        )}
       </nav>
 
-      <div className="mt-2">
-        <div className="px-3 pb-2 text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-          <Calendar className="h-3 w-3" /> شهور 2026
-        </div>
-        <div className="flex flex-col gap-1">
-          {MONTHS.map((m) => {
-            const to = `/months/${m.slug}` as const;
-            const active = location.pathname === to;
+      <div className="mt-2 space-y-3 overflow-y-auto">
+        {useLegacy ? (
+          <div>
+            <div className="px-3 pb-2 text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+              <Calendar className="h-3 w-3" /> شهور 2026
+            </div>
+            <div className="flex flex-col gap-1">
+              {MONTHS.map((m) => {
+                const to = `/months/${m.slug}` as const;
+                const active = location.pathname === to;
+                return (
+                  <Link key={m.slug} to={to} onClick={onNavigate}
+                    className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm ${
+                      active ? "bg-primary/10 text-primary font-semibold" : "hover:bg-sidebar-accent"
+                    }`}>
+                    <span>{m.emoji}</span> <span>{m.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          years.map((y: any) => {
+            const yMonths = monthsByYear.get(y.id) ?? [];
+            if (yMonths.length === 0) return null;
             return (
-              <Link key={m.slug} to={to} onClick={onNavigate}
-                className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm ${
-                  active ? "bg-primary/10 text-primary font-semibold" : "hover:bg-sidebar-accent"
-                }`}
-              >
-                <span>{m.emoji}</span> <span>{m.label}</span>
-              </Link>
+              <div key={y.id}>
+                <div className="px-3 pb-2 text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                  <Calendar className="h-3 w-3" /> شهور {y.year}
+                  {y.is_default && <Badge className="bg-emerald-100 text-emerald-800 text-[10px] py-0">افتراضية</Badge>}
+                </div>
+                <div className="flex flex-col gap-1">
+                  {yMonths.map((m: any) => {
+                    const to = `/months/${m.slug}` as const;
+                    const active = location.pathname === to;
+                    return (
+                      <Link key={m.id} to={to} onClick={onNavigate}
+                        className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm ${
+                          active ? "bg-primary/10 text-primary font-semibold" : "hover:bg-sidebar-accent"
+                        }`}>
+                        <span>{m.emoji ?? "📅"}</span>
+                        <span>{m.name_ar}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
             );
-          })}
-        </div>
+          })
+        )}
       </div>
 
       <div className="mt-auto text-xs text-muted-foreground px-3">
@@ -132,6 +193,7 @@ function SidebarBody({ roles, onNavigate }: { roles: string[]; onNavigate: () =>
     </>
   );
 }
+
 
 function TopBar({ onSignOut, onMenuClick }: { onSignOut: () => void; onMenuClick: () => void }) {
   const navigate = useNavigate();
