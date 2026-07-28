@@ -35,8 +35,9 @@ import { canEditTaskField, isAdminRole } from "@/lib/permissions";
 import { toast } from "sonner";
 import {
   AlertTriangle, Zap, Pencil, Archive, ArchiveRestore, Link2, MessageSquare,
-  Pin, Trash2, Lock, ClipboardList, User, Palette, Activity as ActivityIcon,
+  Pin, Trash2, Lock, ClipboardList, User, Palette, Activity as ActivityIcon, Paperclip,
 } from "lucide-react";
+import { FilesTab } from "@/components/tasks/FilesTab";
 
 const FIELD_LABELS: Record<string, string> = {
   task_name: "اسم التاسك", overall_status: "الحالة العامة", customer_name: "العميل",
