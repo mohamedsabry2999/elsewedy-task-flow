@@ -701,9 +701,13 @@ function QuickUpdateDialog({ task, profiles, onClose }: { task: any; profiles: a
                 <SelectContent>{PRIORITY.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
               </Select>
             </MiniField>
-            <MiniField label="موعد التسليم">
+            <MiniField label="تاريخ التسليم">
               <Input type="date" value={form.delivery_due_date}
                 onChange={(e) => setForm({ ...form, delivery_due_date: e.target.value })} />
+            </MiniField>
+            <MiniField label="وقت التسليم">
+              <Input type="time" value={form.delivery_due_time}
+                onChange={(e) => setForm({ ...form, delivery_due_time: e.target.value })} />
             </MiniField>
             <MiniField label="مسؤول السيلز">
               <ProfileSelect value={form.sales_owner_id} profiles={profiles}
@@ -714,6 +718,24 @@ function QuickUpdateDialog({ task, profiles, onClose }: { task: any; profiles: a
                 onChange={(v) => setForm({ ...form, designer_id: v ?? "" })} />
             </MiniField>
           </div>
+          {form.overall_status === "متوقف" && (
+            <MiniField label="سبب الإيقاف (إلزامي)">
+              <Textarea value={form.stop_reason}
+                onChange={(e) => setForm({ ...form, stop_reason: e.target.value })} />
+            </MiniField>
+          )}
+          {form.overall_status === "تعديلات" && (
+            <MiniField label="ملاحظة التعديل (إلزامي)">
+              <Textarea value={form.revision_note}
+                onChange={(e) => setForm({ ...form, revision_note: e.target.value })} />
+            </MiniField>
+          )}
+          {isReopen && (
+            <MiniField label="سبب إعادة الفتح (إلزامي)">
+              <Textarea value={form.reopen_note}
+                onChange={(e) => setForm({ ...form, reopen_note: e.target.value })} />
+            </MiniField>
+          )}
           <MiniField label="ملاحظة (اختياري)">
             <Textarea value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
           </MiniField>
