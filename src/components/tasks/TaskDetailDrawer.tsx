@@ -162,10 +162,11 @@ export function TaskDetailDrawer({ taskId, open, onClose }: { taskId: string | n
 
           {/* Tabs */}
           <Tabs defaultValue="overview" className="flex-1 flex flex-col overflow-hidden">
-            <TabsList className="mx-5 mt-4 grid grid-cols-5">
+            <TabsList className="mx-5 mt-4 grid grid-cols-6">
               <TabsTrigger value="overview"><ClipboardList className="h-3.5 w-3.5 ml-1" /> نظرة عامة</TabsTrigger>
               <TabsTrigger value="sales"><User className="h-3.5 w-3.5 ml-1" /> السيلز</TabsTrigger>
               <TabsTrigger value="design"><Palette className="h-3.5 w-3.5 ml-1" /> التصميم</TabsTrigger>
+              <TabsTrigger value="files"><Paperclip className="h-3.5 w-3.5 ml-1" /> الملفات</TabsTrigger>
               <TabsTrigger value="comments"><MessageSquare className="h-3.5 w-3.5 ml-1" /> التعليقات</TabsTrigger>
               <TabsTrigger value="activity"><ActivityIcon className="h-3.5 w-3.5 ml-1" /> السجل</TabsTrigger>
             </TabsList>
@@ -179,6 +180,14 @@ export function TaskDetailDrawer({ taskId, open, onClose }: { taskId: string | n
               </TabsContent>
               <TabsContent value="design" className="mt-0">
                 <DesignTab task={task} profiles={profiles} canEdit={canEdit} />
+              </TabsContent>
+              <TabsContent value="files" className="mt-0">
+                <FilesTab
+                  taskId={task.id}
+                  nameById={nameById}
+                  canUpload={canEdit("files_url") || canEdit("final_version_url") || canAdmin}
+                  canDelete={canAdmin}
+                />
               </TabsContent>
               <TabsContent value="comments" className="mt-0">
                 <CommentsTab taskId={task.id} comments={comments} nameById={nameById} canAdmin={canAdmin} roles={roles} />
