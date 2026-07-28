@@ -6,7 +6,9 @@ import {
   listYears, createYear, updateYear, deleteYear,
   listMonths, createMonth, bulkCreateMonths, updateMonth, deleteMonth,
   listStructureAudit, canManageStructure,
+  listTemplates, createTemplate, updateTemplate, deleteTemplate, assignTemplateToMonth,
 } from "@/lib/structure.functions";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
