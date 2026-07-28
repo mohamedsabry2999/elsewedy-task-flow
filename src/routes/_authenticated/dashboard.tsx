@@ -5,6 +5,7 @@ import { dashboardStats, listProfiles } from "@/lib/tasks.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 import { MONTHS, OVERALL_STATUS } from "@/lib/i18n";
+import { BrandMark } from "@/components/brand/BrandMark";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
@@ -40,9 +41,12 @@ function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">لوحة القيادة</h1>
-        <p className="text-sm text-muted-foreground">نظرة عامة على أداء الفريق ومهام السيلز والتصميم</p>
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold">لوحة القيادة</h1>
+          <p className="text-sm text-muted-foreground">نظرة عامة على أداء الفريق ومهام السيلز والتصميم</p>
+        </div>
+        <BrandMark size="md" className="hidden md:block opacity-90" />
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

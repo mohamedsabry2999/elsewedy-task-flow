@@ -13,6 +13,8 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
+import { ClientOnly } from "@/components/util/ClientOnly";
+import { BRAND_LOGO_URL } from "@/components/brand/BrandMark";
 
 function NotFoundComponent() {
   return (
@@ -73,11 +75,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: "Elsewedy Task Flow — إدارة مهام السيلز والتصميم" },
       { name: "twitter:description", content: "منصة إدارة مهام السيلز والتصميم لدار السويدي للطباعة" },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/3114079a-a027-4cdd-904e-4217ae487680/id-preview-975ab2fe--0608d625-8c1d-4e4e-9b6a-5017c3d0ac16.lovable.app-1785222328688.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/3114079a-a027-4cdd-904e-4217ae487680/id-preview-975ab2fe--0608d625-8c1d-4e4e-9b6a-5017c3d0ac16.lovable.app-1785222328688.png" },
+      { property: "og:image", content: BRAND_LOGO_URL },
+      { name: "twitter:image", content: BRAND_LOGO_URL },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
+      { rel: "icon", type: "image/png", href: "/favicon.png" },
+      { rel: "apple-touch-icon", href: "/favicon.png" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
@@ -120,7 +124,9 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <Outlet />
-      <Toaster position="top-center" richColors />
+      <ClientOnly>
+        <Toaster position="top-center" richColors />
+      </ClientOnly>
     </QueryClientProvider>
   );
 }
