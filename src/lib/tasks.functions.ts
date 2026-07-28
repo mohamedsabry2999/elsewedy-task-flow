@@ -93,15 +93,54 @@ export const softDeleteTask = createServerFn({ method: "POST" })
 
 export const addComment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { task_id: string; body: string }) => d)
+  .inputValidator((d: {
+    task_id: string; body: string;
+    parent_id?: string | null; is_internal?: boolean;
+  }) => d)
   .handler(async ({ data, context }) => {
     if (!data.body.trim()) throw new Error("empty");
     const { data: row, error } = await context.supabase
       .from("task_comments")
-      .insert({ task_id: data.task_id, author_id: context.userId, body: data.body.trim() })
+      .insert({
+        task_id: data.task_id,
+        author_id: context.userId,
+        body: data.body.trim(),
+        parent_id: data.parent_id ?? null,
+        is_internal: data.is_internal ?? false,
+      } as any)
       .select().single();
     if (error) throw new Error(error.message);
     return row;
+  });
+
+export const editComment = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string; body: string }) => d)
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase.from("task_comments")
+      .update({ body: data.body.trim(), edited_at: new Date().toISOString() } as any)
+      .eq("id", data.id).eq("author_id", context.userId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const deleteComment = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string }) => d)
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase.from("task_comments").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const pinComment = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string; pinned: boolean }) => d)
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase.from("task_comments")
+      .update({ is_pinned: data.pinned } as any).eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
   });
 
 export const listComments = createServerFn({ method: "POST" })
@@ -112,6 +151,58 @@ export const listComments = createServerFn({ method: "POST" })
       .from("task_comments").select("*").eq("task_id", data.task_id).order("created_at");
     if (error) throw new Error(error.message);
     return rows ?? [];
+  });
+
+// Quick update — server-validates transitions and returns the diff.
+export const quickUpdateTask = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: {
+    id: string;
+    patch: Record<string, unknown>;
+    note?: string;
+  }) => d)
+  .handler(async ({ data, context }) => {
+    const { data: cur, error: getErr } = await context.supabase
+      .from("tasks").select("*").eq("id", data.id).maybeSingle();
+    if (getErr) throw new Error(getErr.message);
+    if (!cur) throw new Error("التاسك غير موجود");
+
+    const next: any = { ...cur, ...data.patch };
+
+    // Transition validations
+    const missing: string[] = [];
+    if (data.patch.overall_status === "جاهز للتصميم") {
+      if (!next.customer_name?.trim()) missing.push("اسم العميل");
+      if (!next.products || (next.products as string[]).length === 0) missing.push("المنتج / الخدمة");
+      if (!next.order_details?.trim()) missing.push("تفاصيل الطلب");
+      if (!next.design_brief?.trim()) missing.push("المطلوب من التصميم");
+      if (!next.delivery_due_date) missing.push("موعد التسليم");
+    }
+    if (data.patch.overall_status === "قيد التصميم" && !next.design_start_date) {
+      (data.patch as any).design_start_date = new Date().toISOString().slice(0, 10);
+    }
+    if (data.patch.overall_status === "بانتظار الاعتماد") {
+      if (!next.files_url && !next.final_version_url) missing.push("رابط ملف تصميم واحد على الأقل");
+    }
+    if (data.patch.overall_status === "مكتمل") {
+      if (next.design_status !== "معتمد") missing.push("حالة التصميم يجب أن تكون معتمد");
+      if (!next.final_version_url) missing.push("رابط النسخة النهائية");
+      if (!next.actual_delivery_date) missing.push("تاريخ التسليم الفعلي");
+      if (!next.delivered) missing.push("تفعيل مربع تم التسليم");
+    }
+    if (missing.length) throw new Error("لا يمكن التحديث. مطلوب: " + missing.join(" • "));
+
+    const { data: row, error } = await context.supabase
+      .from("tasks").update(data.patch as any).eq("id", data.id).select().single();
+    if (error) throw new Error(error.message);
+
+    if (data.note?.trim()) {
+      await context.supabase.from("task_activity").insert({
+        task_id: data.id, actor_id: context.userId, action: "note",
+        details: { note: data.note.trim() },
+      } as any);
+    }
+    return row;
   });
 
 export const listActivity = createServerFn({ method: "POST" })
@@ -185,7 +276,9 @@ export const listProfiles = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase
-      .from("profiles").select("id, full_name, email, is_active").order("full_name");
+      .from("profiles")
+      .select("id, full_name, email, is_active, avatar_url, phone, department, job_title, branch, last_sign_in_at, archived_at, created_at")
+      .order("full_name");
     if (error) throw new Error(error.message);
     const { data: roles } = await context.supabase.from("user_roles").select("user_id, role");
     const roleMap = new Map<string, string[]>();
@@ -194,7 +287,7 @@ export const listProfiles = createServerFn({ method: "GET" })
       arr.push(r.role as string);
       roleMap.set(r.user_id, arr);
     });
-    return (data ?? []).map((p) => ({ ...p, roles: roleMap.get(p.id) ?? [] }));
+    return (data ?? []).map((p) => ({ ...(p as any), roles: roleMap.get((p as any).id) ?? [] }));
   });
 
 export const myRoles = createServerFn({ method: "GET" })
