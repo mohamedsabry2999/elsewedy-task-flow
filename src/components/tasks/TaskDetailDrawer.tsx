@@ -805,7 +805,7 @@ function FullEditDialog({
     mutationFn: () => {
       const patch: Record<string, any> = {};
       for (const k of dirtyKeys) patch[k] = (form as any)[k];
-      return updFn({ data: { id: task.id, patch } });
+      return updFn({ data: { id: task.id, patch, expected_updated_at: task.updated_at ?? undefined } });
     },
     onSuccess: () => {
       toast.success("تم حفظ التعديلات");
