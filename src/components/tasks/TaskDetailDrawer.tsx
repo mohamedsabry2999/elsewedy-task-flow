@@ -45,9 +45,11 @@ const FIELD_LABELS: Record<string, string> = {
   order_details: "تفاصيل الطلب", size_qty_material: "المقاس/الكمية/الخامة",
   design_brief: "المطلوب من التصميم", priority: "الأولوية", request_date: "تاريخ الطلب",
   designer_id: "مسؤول التصميم", design_status: "حالة التصميم", design_start_date: "بدء التصميم",
-  delivery_due_date: "موعد التسليم", files_url: "رابط الملفات", designer_notes: "ملاحظات المصمم",
+  delivery_due_date: "تاريخ التسليم", delivery_due_time: "وقت التسليم",
+  files_url: "رابط الملفات", designer_notes: "ملاحظات المصمم",
   sales_client_revisions: "تعديلات العميل", final_version_url: "النسخة النهائية",
   actual_delivery_date: "التسليم الفعلي", delivered: "تم التسليم", is_archived: "الأرشفة",
+  stop_reason: "سبب الإيقاف", revision_note: "ملاحظة التعديل", reopen_note: "سبب إعادة الفتح",
 };
 
 export function TaskDetailDrawer({ taskId, open, onClose }: { taskId: string | null; open: boolean; onClose: () => void }) {
