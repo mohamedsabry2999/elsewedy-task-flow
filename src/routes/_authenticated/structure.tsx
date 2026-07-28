@@ -550,8 +550,6 @@ function TemplatesPanel() {
                       disabled={t.is_system_default}>
                       <Star className="h-3.5 w-3.5" />
                     </Button>
-                      <Star className="h-3.5 w-3.5" />
-                    </Button>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button size="sm" variant="ghost" className="text-red-600" disabled={t.is_system_default || t.months_using > 0}>
