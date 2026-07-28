@@ -147,13 +147,16 @@ export function TaskDetailDrawer({ taskId, open, onClose }: { taskId: string | n
               </Section>
 
               <Section title="checklist السيلز">
-                {SALES_CHECKLIST_ITEMS.map((it) => (
-                  <label key={it.key} className="flex items-center gap-2 text-sm">
-                    <Checkbox checked={!!task.sales_checklist?.[it.key]}
-                      onCheckedChange={(v) => patch.mutate({ sales_checklist: { ...(task.sales_checklist || {}), [it.key]: !!v } })} />
-                    {it.label}
-                  </label>
-                ))}
+                {SALES_CHECKLIST_ITEMS.map((it) => {
+                  const cl = (task.sales_checklist as Record<string, boolean> | null) ?? {};
+                  return (
+                    <label key={it.key} className="flex items-center gap-2 text-sm">
+                      <Checkbox checked={!!cl[it.key]}
+                        onCheckedChange={(v) => patch.mutate({ sales_checklist: { ...cl, [it.key]: !!v } })} />
+                      {it.label}
+                    </label>
+                  );
+                })}
               </Section>
 
               <Section title="بيانات التصميم">
@@ -197,13 +200,16 @@ export function TaskDetailDrawer({ taskId, open, onClose }: { taskId: string | n
               </Section>
 
               <Section title="checklist التصميم">
-                {DESIGN_CHECKLIST_ITEMS.map((it) => (
-                  <label key={it.key} className="flex items-center gap-2 text-sm">
-                    <Checkbox checked={!!task.design_checklist?.[it.key]}
-                      onCheckedChange={(v) => patch.mutate({ design_checklist: { ...(task.design_checklist || {}), [it.key]: !!v } })} />
-                    {it.label}
-                  </label>
-                ))}
+                {DESIGN_CHECKLIST_ITEMS.map((it) => {
+                  const cl = (task.design_checklist as Record<string, boolean> | null) ?? {};
+                  return (
+                    <label key={it.key} className="flex items-center gap-2 text-sm">
+                      <Checkbox checked={!!cl[it.key]}
+                        onCheckedChange={(v) => patch.mutate({ design_checklist: { ...cl, [it.key]: !!v } })} />
+                      {it.label}
+                    </label>
+                  );
+                })}
               </Section>
 
               <Separator />
