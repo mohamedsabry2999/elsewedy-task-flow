@@ -11,6 +11,11 @@ async function requireAdmin(supabase: any, userId: string) {
   return roles;
 }
 
+const roleEnum = z.enum([
+  "super_admin", "admin", "sales_manager", "sales_executive",
+  "design_manager", "designer", "view_only",
+]);
+
 // Create a new user with a role. Admins/super admins only.
 export const adminCreateUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -19,13 +24,19 @@ export const adminCreateUser = createServerFn({ method: "POST" })
       email: z.string().trim().email(),
       password: z.string().min(8).max(200),
       full_name: z.string().trim().min(1).max(120),
-      role: z.enum([
-        "super_admin","admin","sales_manager","sales_executive","design_manager","designer","view_only",
-      ]),
+      role: roleEnum,
+      phone: z.string().trim().max(30).optional().nullable(),
+      department: z.string().trim().max(60).optional().nullable(),
+      job_title: z.string().trim().max(120).optional().nullable(),
+      branch: z.string().trim().max(60).optional().nullable(),
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
-    await requireAdmin(context.supabase, context.userId);
+    const requesterRoles = await requireAdmin(context.supabase, context.userId);
+    // Only super_admin can create super_admin or admin
+    if ((data.role === "super_admin" || data.role === "admin") && !requesterRoles.includes("super_admin")) {
+      throw new Error("Forbidden: super admin required to create admin roles");
+    }
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
       email: data.email, password: data.password, email_confirm: true,
@@ -33,21 +44,34 @@ export const adminCreateUser = createServerFn({ method: "POST" })
     });
     if (error) throw new Error(error.message);
     const uid = created.user!.id;
-    // trigger creates default view_only role; overwrite with the requested one
     await supabaseAdmin.from("user_roles").delete().eq("user_id", uid);
     await supabaseAdmin.from("user_roles").insert({ user_id: uid, role: data.role });
-    await supabaseAdmin.from("profiles").update({ full_name: data.full_name }).eq("id", uid);
+    await supabaseAdmin.from("profiles").update({
+      full_name: data.full_name,
+      phone: data.phone ?? null,
+      department: data.department ?? null,
+      job_title: data.job_title ?? null,
+      branch: data.branch ?? null,
+    }).eq("id", uid);
     return { id: uid };
   });
 
 export const adminSetRole = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { user_id: string; role: string }) => d)
+  .inputValidator((d: unknown) => z.object({ user_id: z.string().uuid(), role: roleEnum }).parse(d))
   .handler(async ({ data, context }) => {
-    await requireAdmin(context.supabase, context.userId);
+    const requesterRoles = await requireAdmin(context.supabase, context.userId);
+    if (data.user_id === context.userId) {
+      throw new Error("لا يمكنك تغيير دورك الخاص");
+    }
+    if ((data.role === "super_admin" || data.role === "admin") && !requesterRoles.includes("super_admin")) {
+      throw new Error("Forbidden: super admin required");
+    }
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // Guard: check for last super_admin also enforced by DB trigger
     await supabaseAdmin.from("user_roles").delete().eq("user_id", data.user_id);
-    await supabaseAdmin.from("user_roles").insert({ user_id: data.user_id, role: data.role as any });
+    const { error } = await supabaseAdmin.from("user_roles").insert({ user_id: data.user_id, role: data.role as any });
+    if (error) throw new Error(error.message);
     return { ok: true };
   });
 
@@ -56,8 +80,95 @@ export const adminToggleActive = createServerFn({ method: "POST" })
   .inputValidator((d: { user_id: string; is_active: boolean }) => d)
   .handler(async ({ data, context }) => {
     await requireAdmin(context.supabase, context.userId);
+    if (data.user_id === context.userId && !data.is_active) {
+      throw new Error("لا يمكنك إيقاف حسابك الخاص");
+    }
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    await supabaseAdmin.from("profiles").update({ is_active: data.is_active }).eq("id", data.user_id);
+    const { error } = await supabaseAdmin.from("profiles").update({ is_active: data.is_active }).eq("id", data.user_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const adminUpdateProfile = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({
+      user_id: z.string().uuid(),
+      full_name: z.string().trim().min(1).max(120).optional(),
+      phone: z.string().trim().max(30).nullable().optional(),
+      department: z.string().trim().max(60).nullable().optional(),
+      job_title: z.string().trim().max(120).nullable().optional(),
+      branch: z.string().trim().max(60).nullable().optional(),
+      avatar_url: z.string().url().nullable().optional(),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { user_id, ...patch } = data;
+    const { error } = await supabaseAdmin.from("profiles").update(patch).eq("id", user_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const adminResetPassword = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ user_id: z.string().uuid(), new_password: z.string().min(8).max(200) }).parse(d))
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(data.user_id, { password: data.new_password });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const adminArchiveUser = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { user_id: string; archive: boolean }) => d)
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context.supabase, context.userId);
+    if (data.user_id === context.userId) throw new Error("لا يمكنك أرشفة حسابك الخاص");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.from("profiles").update({
+      archived_at: data.archive ? new Date().toISOString() : null,
+      is_active: data.archive ? false : true,
+    }).eq("id", data.user_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const adminListOverrides = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { user_id: string }) => d)
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context.supabase, context.userId);
+    const { data: rows, error } = await context.supabase
+      .from("user_permission_overrides").select("*").eq("user_id", data.user_id);
+    if (error) throw new Error(error.message);
+    return rows ?? [];
+  });
+
+export const adminSetOverride = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({
+      user_id: z.string().uuid(),
+      permission_key: z.string().min(1),
+      value: z.enum(["allow", "own", "read", "deny"]).nullable(),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    if (data.value === null) {
+      await supabaseAdmin.from("user_permission_overrides")
+        .delete().eq("user_id", data.user_id).eq("permission_key", data.permission_key);
+      return { ok: true };
+    }
+    const { error } = await supabaseAdmin.from("user_permission_overrides").upsert({
+      user_id: data.user_id, permission_key: data.permission_key, value: data.value, updated_at: new Date().toISOString(),
+    }, { onConflict: "user_id,permission_key" });
+    if (error) throw new Error(error.message);
     return { ok: true };
   });
 
@@ -73,63 +184,13 @@ export const loadDemoData = createServerFn({ method: "POST" })
     const daysAhead = (n: number) => new Date(now.getTime() + n * 86400000).toISOString().slice(0, 10);
 
     const samples = [
-      { month_code: "AUG", task_name: "كتالوج شركة النور — نسخة أغسطس",
-        customer_name: "شركة النور للاستثمار", customer_type: "عميل حالي",
-        products: ["بروشور وكتالوج", "طباعة أوفست"],
-        order_details: "كتالوج 24 صفحة بحجم A4 مع غلاف مقوى.",
-        size_qty_material: "A4 — 500 نسخة — كوشيه 170 جم",
-        design_brief: "تحديث الهوية البصرية للكتالوج مع إبراز خط المنتجات الجديد.",
-        priority: "عالية", overall_status: "قيد التصميم", design_status: "قيد التنفيذ",
-        request_date: daysAgo(10), delivery_due_date: daysAhead(2), delivered: false },
-      { month_code: "AUG", task_name: "علبة تغليف عصير المزرعة",
-        customer_name: "مزرعة الوادي", customer_type: "عميل جديد",
-        products: ["علب وتغليف"],
-        order_details: "علبة كرتون بأربعة تصاميم بنكهات مختلفة.",
-        size_qty_material: "10×10×20 سم — 2000 نسخة — دوبلكس 350 جم",
-        design_brief: "تصاميم مبهجة بألوان الفواكه الطبيعية.",
-        priority: "عاجل", overall_status: "جاهز للتصميم", design_status: "لم يبدأ",
-        request_date: daysAgo(2), delivery_due_date: daysAhead(7), delivered: false },
-      { month_code: "SEP", task_name: "استيكرات معرض القاهرة",
-        customer_name: "معرض القاهرة الدولي", customer_type: "عميل محتمل",
-        products: ["ليبل واستيكر"],
-        order_details: "استيكرات لتغليف الهدايا الترويجية.",
-        size_qty_material: "8×8 سم — 5000 قطعة — كوشيه لاصق",
-        design_brief: "شعار المعرض بألوان زاهية.",
-        priority: "متوسطة", overall_status: "بانتظار الاعتماد", design_status: "بانتظار الاعتماد",
-        request_date: daysAgo(5), delivery_due_date: daysAhead(10), delivered: false },
-      { month_code: "SEP", task_name: "بروشور خدمات بنك مصر",
-        customer_name: "بنك مصر", customer_type: "عميل حالي",
-        products: ["بروشور وكتالوج", "طباعة ديجيتال"],
-        order_details: "بروشور ثلاثي الطي للخدمات الرقمية.",
-        size_qty_material: "A4 مطوي — 1000 نسخة — كوشيه 170 جم",
-        design_brief: "بأسلوب رسمي يعكس هوية البنك.",
-        priority: "عادية", overall_status: "مكتمل", design_status: "معتمد",
-        request_date: daysAgo(30), delivery_due_date: daysAgo(5),
-        actual_delivery_date: daysAgo(4), delivered: true },
-      { month_code: "OCT", task_name: "شيتات دعائية لمعرض السيارات",
-        customer_name: "شركة السويدي موتورز", customer_type: "عميل حالي",
-        products: ["شيتات 50×70"],
-        order_details: "بوسترات ترويجية للمعرض.",
-        size_qty_material: "50×70 سم — 300 نسخة — كوشيه 200 جم",
-        design_brief: "صور احترافية للسيارات الجديدة.",
-        priority: "عالية", overall_status: "عند السيلز", design_status: "لم يبدأ",
-        request_date: daysAgo(1), delivery_due_date: daysAhead(14), delivered: false },
-      { month_code: "NOV", task_name: "طباعة ديجيتال — ملفات تعريفية",
-        customer_name: "شركة ألفا للاستشارات", customer_type: "عميل جديد",
-        products: ["طباعة ديجيتال"],
-        order_details: "ملفات تعريفية للموظفين الجدد.",
-        size_qty_material: "A4 — 200 نسخة — 120 جم",
-        design_brief: "تصميم بسيط بألوان الشركة.",
-        priority: "متوسطة", overall_status: "تعديلات", design_status: "تعديلات",
-        request_date: daysAgo(7), delivery_due_date: daysAhead(20), delivered: false },
-      { month_code: "DEC", task_name: "كتالوج نهاية العام للسويدي",
-        customer_name: "الإدارة الداخلية", customer_type: "عميل حالي",
-        products: ["بروشور وكتالوج", "طباعة أوفست"],
-        order_details: "ملخص إنجازات العام.",
-        size_qty_material: "A4 — 100 نسخة — كوشيه 250 جم",
-        design_brief: "تصميم فاخر يبرز إنجازات 2026.",
-        priority: "عاجل", overall_status: "جديد", design_status: "لم يبدأ",
-        request_date: daysAgo(0), delivery_due_date: daysAhead(30), delivered: false },
+      { month_code: "AUG", task_name: "كتالوج شركة النور — نسخة أغسطس", customer_name: "شركة النور للاستثمار", customer_type: "عميل حالي", products: ["بروشور وكتالوج", "طباعة أوفست"], order_details: "كتالوج 24 صفحة بحجم A4 مع غلاف مقوى.", size_qty_material: "A4 — 500 نسخة — كوشيه 170 جم", design_brief: "تحديث الهوية البصرية للكتالوج مع إبراز خط المنتجات الجديد.", priority: "عالية", overall_status: "قيد التصميم", design_status: "قيد التنفيذ", request_date: daysAgo(10), delivery_due_date: daysAhead(2), delivered: false },
+      { month_code: "AUG", task_name: "علبة تغليف عصير المزرعة", customer_name: "مزرعة الوادي", customer_type: "عميل جديد", products: ["علب وتغليف"], order_details: "علبة كرتون بأربعة تصاميم بنكهات مختلفة.", size_qty_material: "10×10×20 سم — 2000 نسخة — دوبلكس 350 جم", design_brief: "تصاميم مبهجة بألوان الفواكه الطبيعية.", priority: "عاجل", overall_status: "جاهز للتصميم", design_status: "لم يبدأ", request_date: daysAgo(2), delivery_due_date: daysAhead(7), delivered: false },
+      { month_code: "SEP", task_name: "استيكرات معرض القاهرة", customer_name: "معرض القاهرة الدولي", customer_type: "عميل محتمل", products: ["ليبل واستيكر"], order_details: "استيكرات لتغليف الهدايا الترويجية.", size_qty_material: "8×8 سم — 5000 قطعة — كوشيه لاصق", design_brief: "شعار المعرض بألوان زاهية.", priority: "متوسطة", overall_status: "بانتظار الاعتماد", design_status: "بانتظار الاعتماد", request_date: daysAgo(5), delivery_due_date: daysAhead(10), delivered: false },
+      { month_code: "SEP", task_name: "بروشور خدمات بنك مصر", customer_name: "بنك مصر", customer_type: "عميل حالي", products: ["بروشور وكتالوج", "طباعة ديجيتال"], order_details: "بروشور ثلاثي الطي للخدمات الرقمية.", size_qty_material: "A4 مطوي — 1000 نسخة — كوشيه 170 جم", design_brief: "بأسلوب رسمي يعكس هوية البنك.", priority: "عادية", overall_status: "مكتمل", design_status: "معتمد", request_date: daysAgo(30), delivery_due_date: daysAgo(5), actual_delivery_date: daysAgo(4), delivered: true },
+      { month_code: "OCT", task_name: "شيتات دعائية لمعرض السيارات", customer_name: "شركة السويدي موتورز", customer_type: "عميل حالي", products: ["شيتات 50×70"], order_details: "بوسترات ترويجية للمعرض.", size_qty_material: "50×70 سم — 300 نسخة — كوشيه 200 جم", design_brief: "صور احترافية للسيارات الجديدة.", priority: "عالية", overall_status: "عند السيلز", design_status: "لم يبدأ", request_date: daysAgo(1), delivery_due_date: daysAhead(14), delivered: false },
+      { month_code: "NOV", task_name: "طباعة ديجيتال — ملفات تعريفية", customer_name: "شركة ألفا للاستشارات", customer_type: "عميل جديد", products: ["طباعة ديجيتال"], order_details: "ملفات تعريفية للموظفين الجدد.", size_qty_material: "A4 — 200 نسخة — 120 جم", design_brief: "تصميم بسيط بألوان الشركة.", priority: "متوسطة", overall_status: "تعديلات", design_status: "تعديلات", request_date: daysAgo(7), delivery_due_date: daysAhead(20), delivered: false },
+      { month_code: "DEC", task_name: "كتالوج نهاية العام للسويدي", customer_name: "الإدارة الداخلية", customer_type: "عميل حالي", products: ["بروشور وكتالوج", "طباعة أوفست"], order_details: "ملخص إنجازات العام.", size_qty_material: "A4 — 100 نسخة — كوشيه 250 جم", design_brief: "تصميم فاخر يبرز إنجازات 2026.", priority: "عاجل", overall_status: "جديد", design_status: "لم يبدأ", request_date: daysAgo(0), delivery_due_date: daysAhead(30), delivered: false },
     ];
 
     const rows = samples.map((s) => ({ ...s, is_demo: true, created_by: context.userId, sales_owner_id: context.userId }));
@@ -143,8 +204,7 @@ export const removeDemoData = createServerFn({ method: "POST" })
   .handler(async ({ context }) => {
     await requireAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error, count } = await supabaseAdmin
-      .from("tasks").delete({ count: "exact" }).eq("is_demo", true);
+    const { error, count } = await supabaseAdmin.from("tasks").delete({ count: "exact" }).eq("is_demo", true);
     if (error) throw new Error(error.message);
     return { deleted: count ?? 0 };
   });
@@ -160,8 +220,7 @@ export const bootstrapFirstAdmin = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: existing } = await supabaseAdmin
-      .from("user_roles").select("user_id").eq("role", "super_admin").limit(1);
+    const { data: existing } = await supabaseAdmin.from("user_roles").select("user_id").eq("role", "super_admin").limit(1);
     if (existing && existing.length > 0) throw new Error("Setup already completed");
     const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
       email: data.email, password: data.password, email_confirm: true,
