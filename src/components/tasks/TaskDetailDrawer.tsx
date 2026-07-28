@@ -74,16 +74,16 @@ export function TaskDetailDrawer({ taskId, open, onClose }: { taskId: string | n
 
   const nameById = useMemo(() => new Map(profiles.map((p) => [p.id, p.full_name || p.email])), [profiles]);
 
-  const ownership = useMemo(() => ({
-    isSalesOwner: !!task && task.sales_owner_id === (task as any)?.__me,
-    isDesigner: !!task && task.designer_id === (task as any)?.__me,
-  }), [task]);
-  // The auth-middleware already scopes ID; approximate ownership via profile presence.
-  const currentUserId = profiles.find((p) => (p as any).id && (p as any).__self)?.id ?? null;
-  const own = task ? {
-    isSalesOwner: !!currentUserId && task.sales_owner_id === currentUserId,
-    isDesigner: !!currentUserId && task.designer_id === currentUserId,
-  } : ownership;
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  useEffect(() => {
+    import("@/integrations/supabase/client").then(({ supabase }) => {
+      supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id ?? null));
+    });
+  }, []);
+  const own = {
+    isSalesOwner: !!currentUserId && !!task && task.sales_owner_id === currentUserId,
+    isDesigner: !!currentUserId && !!task && task.designer_id === currentUserId,
+  };
 
   const canEdit = (f: string) => task ? canEditTaskField(roles, f, own) : false;
   const canAdmin = isAdminRole(roles);
