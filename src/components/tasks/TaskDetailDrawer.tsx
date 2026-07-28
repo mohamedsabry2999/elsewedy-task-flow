@@ -30,7 +30,7 @@ import {
   OVERALL_STATUS, DESIGN_STATUS, PRIORITY, CUSTOMER_TYPE, PRODUCT_SERVICE,
   SALES_CHECKLIST_ITEMS, DESIGN_CHECKLIST_ITEMS, STATUS_COLOR, PRIORITY_COLOR,
 } from "@/lib/i18n";
-import { formatDate, formatDateTime, isOverdue } from "@/lib/format";
+import { formatDate, formatDateTime, formatDueDateTime, isOverdue } from "@/lib/format";
 import { canEditTaskField, isAdminRole } from "@/lib/permissions";
 import { toast } from "sonner";
 import {
@@ -45,9 +45,11 @@ const FIELD_LABELS: Record<string, string> = {
   order_details: "تفاصيل الطلب", size_qty_material: "المقاس/الكمية/الخامة",
   design_brief: "المطلوب من التصميم", priority: "الأولوية", request_date: "تاريخ الطلب",
   designer_id: "مسؤول التصميم", design_status: "حالة التصميم", design_start_date: "بدء التصميم",
-  delivery_due_date: "موعد التسليم", files_url: "رابط الملفات", designer_notes: "ملاحظات المصمم",
+  delivery_due_date: "تاريخ التسليم", delivery_due_time: "وقت التسليم",
+  files_url: "رابط الملفات", designer_notes: "ملاحظات المصمم",
   sales_client_revisions: "تعديلات العميل", final_version_url: "النسخة النهائية",
   actual_delivery_date: "التسليم الفعلي", delivered: "تم التسليم", is_archived: "الأرشفة",
+  stop_reason: "سبب الإيقاف", revision_note: "ملاحظة التعديل", reopen_note: "سبب إعادة الفتح",
 };
 
 export function TaskDetailDrawer({ taskId, open, onClose }: { taskId: string | null; open: boolean; onClose: () => void }) {
@@ -136,7 +138,7 @@ export function TaskDetailDrawer({ taskId, open, onClose }: { taskId: string | n
                 <div>العميل: <span className="text-foreground">{task.customer_name || "—"}</span></div>
                 <div>السيلز: <span className="text-foreground">{nameById.get(task.sales_owner_id ?? "") ?? "—"}</span></div>
                 <div>المصمم: <span className="text-foreground">{nameById.get(task.designer_id ?? "") ?? "—"}</span></div>
-                <div>التسليم: <span className="text-foreground">{formatDate(task.delivery_due_date)}</span></div>
+                <div>التسليم: <span className="text-foreground">{formatDueDateTime(task.delivery_due_date, task.delivery_due_time)}</span></div>
                 <div className="col-span-2">آخر تحديث: {formatDateTime(task.updated_at)}</div>
               </div>
             </SheetHeader>
@@ -396,9 +398,24 @@ function DesignTab({ task, profiles, canEdit }: { task: any; profiles: any[]; ca
           <Input type="date" defaultValue={task.design_start_date ?? ""} disabled={!canEdit("design_start_date")}
             onBlur={(e) => patch({ design_start_date: e.target.value || null })} />
         </FieldRow>
-        <FieldRow label="موعد التسليم" locked={!canEdit("delivery_due_date")}>
+        <FieldRow label="تاريخ التسليم" locked={!canEdit("delivery_due_date")}>
           <Input type="date" defaultValue={task.delivery_due_date ?? ""} disabled={!canEdit("delivery_due_date")}
             onBlur={(e) => patch({ delivery_due_date: e.target.value || null })} />
+        </FieldRow>
+        <FieldRow label="وقت التسليم" locked={!canEdit("delivery_due_date")}>
+          <Input type="time" defaultValue={task.delivery_due_time ?? ""} disabled={!canEdit("delivery_due_date")}
+            onBlur={(e) => patch({ delivery_due_time: e.target.value || null })} />
+        </FieldRow>
+      </div>
+      <div className="grid grid-cols-1 gap-3">
+        <FieldRow label="سبب الإيقاف (لو الحالة متوقف)">
+          <Textarea defaultValue={task.stop_reason ?? ""} onBlur={(e) => patch({ stop_reason: e.target.value || null })} />
+        </FieldRow>
+        <FieldRow label="ملاحظة التعديل (لو الحالة تعديلات)">
+          <Textarea defaultValue={task.revision_note ?? ""} onBlur={(e) => patch({ revision_note: e.target.value || null })} />
+        </FieldRow>
+        <FieldRow label="سبب إعادة الفتح (عند إعادة فتح مكتمل)">
+          <Textarea defaultValue={task.reopen_note ?? ""} onBlur={(e) => patch({ reopen_note: e.target.value || null })} />
         </FieldRow>
       </div>
       <FieldRow label="رابط الملفات" locked={!canEdit("files_url")}>
@@ -608,6 +625,10 @@ function QuickUpdateDialog({ task, profiles, onClose }: { task: any; profiles: a
     sales_owner_id: task.sales_owner_id ?? "",
     designer_id: task.designer_id ?? "",
     delivery_due_date: task.delivery_due_date ?? "",
+    delivery_due_time: task.delivery_due_time ?? "",
+    stop_reason: task.stop_reason ?? "",
+    revision_note: task.revision_note ?? "",
+    reopen_note: task.reopen_note ?? "",
     note: "",
   });
   const diff = useMemo(() => {
@@ -616,6 +637,9 @@ function QuickUpdateDialog({ task, profiles, onClose }: { task: any; profiles: a
       overall_status: task.overall_status, design_status: task.design_status,
       priority: task.priority, sales_owner_id: task.sales_owner_id ?? "",
       designer_id: task.designer_id ?? "", delivery_due_date: task.delivery_due_date ?? "",
+      delivery_due_time: task.delivery_due_time ?? "",
+      stop_reason: task.stop_reason ?? "", revision_note: task.revision_note ?? "",
+      reopen_note: task.reopen_note ?? "",
     };
     for (const k of Object.keys(map)) {
       if ((form as any)[k] !== map[k]) d[k] = [map[k], (form as any)[k]];
@@ -623,13 +647,23 @@ function QuickUpdateDialog({ task, profiles, onClose }: { task: any; profiles: a
     return d;
   }, [form, task]);
 
+  const needsStopReason = form.overall_status === "متوقف" && !form.stop_reason.trim();
+  const needsRevisionNote = form.overall_status === "تعديلات" && !form.revision_note.trim();
+  const isReopen = task.overall_status === "مكتمل" && form.overall_status !== "مكتمل";
+  const needsReopenNote = isReopen && !form.reopen_note.trim();
+
   const submit = useMutation({
     mutationFn: () => {
       const patch: Record<string, any> = {};
       for (const k of Object.keys(diff)) {
-        patch[k] = k.endsWith("_id") || k === "delivery_due_date" ? (diff[k][1] || null) : diff[k][1];
+        const nullable = k.endsWith("_id") || k === "delivery_due_date" || k === "delivery_due_time";
+        patch[k] = nullable ? (diff[k][1] || null) : diff[k][1];
       }
-      return quickFn({ data: { id: task.id, patch, note: form.note.trim() || undefined } });
+      return quickFn({ data: {
+        id: task.id, patch,
+        note: form.note.trim() || undefined,
+        expected_updated_at: task.updated_at ?? undefined,
+      } });
     },
     onSuccess: () => {
       toast.success("تم التحديث");
@@ -669,9 +703,13 @@ function QuickUpdateDialog({ task, profiles, onClose }: { task: any; profiles: a
                 <SelectContent>{PRIORITY.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
               </Select>
             </MiniField>
-            <MiniField label="موعد التسليم">
+            <MiniField label="تاريخ التسليم">
               <Input type="date" value={form.delivery_due_date}
                 onChange={(e) => setForm({ ...form, delivery_due_date: e.target.value })} />
+            </MiniField>
+            <MiniField label="وقت التسليم">
+              <Input type="time" value={form.delivery_due_time}
+                onChange={(e) => setForm({ ...form, delivery_due_time: e.target.value })} />
             </MiniField>
             <MiniField label="مسؤول السيلز">
               <ProfileSelect value={form.sales_owner_id} profiles={profiles}
@@ -682,6 +720,24 @@ function QuickUpdateDialog({ task, profiles, onClose }: { task: any; profiles: a
                 onChange={(v) => setForm({ ...form, designer_id: v ?? "" })} />
             </MiniField>
           </div>
+          {form.overall_status === "متوقف" && (
+            <MiniField label="سبب الإيقاف (إلزامي)">
+              <Textarea value={form.stop_reason}
+                onChange={(e) => setForm({ ...form, stop_reason: e.target.value })} />
+            </MiniField>
+          )}
+          {form.overall_status === "تعديلات" && (
+            <MiniField label="ملاحظة التعديل (إلزامي)">
+              <Textarea value={form.revision_note}
+                onChange={(e) => setForm({ ...form, revision_note: e.target.value })} />
+            </MiniField>
+          )}
+          {isReopen && (
+            <MiniField label="سبب إعادة الفتح (إلزامي)">
+              <Textarea value={form.reopen_note}
+                onChange={(e) => setForm({ ...form, reopen_note: e.target.value })} />
+            </MiniField>
+          )}
           <MiniField label="ملاحظة (اختياري)">
             <Textarea value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
           </MiniField>
@@ -704,7 +760,12 @@ function QuickUpdateDialog({ task, profiles, onClose }: { task: any; profiles: a
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>إلغاء</Button>
-          <Button disabled={Object.keys(diff).length === 0 && !form.note.trim() || submit.isPending}
+          <Button
+            disabled={
+              (Object.keys(diff).length === 0 && !form.note.trim())
+              || submit.isPending
+              || needsStopReason || needsRevisionNote || needsReopenNote
+            }
             onClick={() => submit.mutate()}>حفظ التحديث</Button>
         </DialogFooter>
       </DialogContent>
@@ -746,7 +807,7 @@ function FullEditDialog({
     mutationFn: () => {
       const patch: Record<string, any> = {};
       for (const k of dirtyKeys) patch[k] = (form as any)[k];
-      return updFn({ data: { id: task.id, patch } });
+      return updFn({ data: { id: task.id, patch, expected_updated_at: task.updated_at ?? undefined } });
     },
     onSuccess: () => {
       toast.success("تم حفظ التعديلات");
@@ -868,9 +929,25 @@ function FullEditDialog({
                   <Input type="date" value={form.design_start_date ?? ""} disabled={!canEdit("design_start_date")}
                     onChange={(e) => upd("design_start_date", e.target.value || null)} />
                 </MiniField>
-                <MiniField label="موعد التسليم">
+                <MiniField label="تاريخ التسليم">
                   <Input type="date" value={form.delivery_due_date ?? ""} disabled={!canEdit("delivery_due_date")}
                     onChange={(e) => upd("delivery_due_date", e.target.value || null)} />
+                </MiniField>
+                <MiniField label="وقت التسليم">
+                  <Input type="time" value={form.delivery_due_time ?? ""} disabled={!canEdit("delivery_due_date")}
+                    onChange={(e) => upd("delivery_due_time", e.target.value || null)} />
+                </MiniField>
+                <MiniField label="سبب الإيقاف">
+                  <Textarea value={form.stop_reason ?? ""}
+                    onChange={(e) => upd("stop_reason", e.target.value || null)} />
+                </MiniField>
+                <MiniField label="ملاحظة التعديل">
+                  <Textarea value={form.revision_note ?? ""}
+                    onChange={(e) => upd("revision_note", e.target.value || null)} />
+                </MiniField>
+                <MiniField label="سبب إعادة الفتح">
+                  <Textarea value={form.reopen_note ?? ""}
+                    onChange={(e) => upd("reopen_note", e.target.value || null)} />
                 </MiniField>
               </div>
               <MiniField label="رابط الملفات">
