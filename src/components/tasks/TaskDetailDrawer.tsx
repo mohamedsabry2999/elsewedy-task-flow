@@ -60,18 +60,32 @@ export function TaskDetailDrawer({ taskId, open, onClose }: { taskId: string | n
   const profilesFn = useServerFn(listProfiles);
   const rolesFn = useServerFn(myRoles);
 
-  const { data: task } = useQuery({
+  const { data: task, isFetched: taskFetched } = useQuery({
     queryKey: ["task", taskId], queryFn: () => getFn({ data: { id: taskId! } }),
     enabled: !!taskId,
+    refetchInterval: 20_000,
+    refetchOnWindowFocus: true,
   });
   const { data: comments = [] } = useQuery({
     queryKey: ["comments", taskId], queryFn: () => commentsFn({ data: { task_id: taskId! } }),
-    enabled: !!taskId,
+    enabled: !!taskId && !!task,
   });
   const { data: activity = [] } = useQuery({
     queryKey: ["activity", taskId], queryFn: () => activityFn({ data: { task_id: taskId! } }),
-    enabled: !!taskId,
+    enabled: !!taskId && !!task,
   });
+
+  // If access was revoked (assignment changed away), close drawer.
+  useEffect(() => {
+    if (open && taskId && taskFetched && !task) {
+      toast.error("لم يعد لديك صلاحية الوصول إلى هذا التاسك");
+      qc.removeQueries({ queryKey: ["task", taskId] });
+      qc.removeQueries({ queryKey: ["comments", taskId] });
+      qc.removeQueries({ queryKey: ["activity", taskId] });
+      qc.removeQueries({ queryKey: ["files", taskId] });
+      onClose();
+    }
+  }, [open, taskId, taskFetched, task, qc, onClose]);
   const { data: profiles = [] } = useQuery({ queryKey: ["profiles-lite"], queryFn: () => profilesFn() });
   const { data: roles = [] } = useQuery({ queryKey: ["my-roles"], queryFn: () => rolesFn() });
 
