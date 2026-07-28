@@ -1,79 +1,97 @@
-## Elsewedy Task Flow — Implementation Plan
 
-A full-stack Arabic RTL internal workflow app for Elsewedy Print House, Sales → Design pipeline. This is a large build; I'll ship it in ordered phases so each phase is verifiable before moving on.
+# Elsewedy Task Flow — Upgrade Plan
 
-### Assumptions (please correct if wrong)
-- **Auth**: Email/password only, public signup disabled. Admins create users from the Team page (using Cloud Auth admin API from a server function). No Google/Apple.
-- **First admin**: I'll seed one Super Admin account (`admin@elsewedy.local` / temp password shown once in the seed banner) so you can log in immediately. You rotate it after.
-- **Demo data**: A "Load demo data" and "Remove demo data" button in Settings, gated to Super Admin. Rows tagged `is_demo=true` for clean removal.
-- **File storage**: Lovable Cloud Storage bucket `task-files` (private) for attachments + final files; external URLs also supported.
-- **Excel export**: CSV export of the current filtered view (Excel opens CSV natively). True `.xlsx` only if you insist — adds a dependency.
-- **Kanban**: Grouped by "الحالة العامة", drag-and-drop to change status (respecting role permissions).
-- **Notifications**: In-app notification center (bell icon). No email/push in v1.
-- **Timezone**: All timestamps stored UTC, displayed Africa/Cairo, 12-hour format with ص/م.
-- **Months August–December 2026**: Each month page filters `tasks` by `created_at` within that month AND by `month_code` (AUG/SEP/…) derived from Task ID prefix, so tasks stay on their assigned month even if reopened later.
+This is a large upgrade of the existing project. I will preserve all current data, tables, users, tasks, comments, files, and activity. No table drops or renames. Migrations will be additive only.
 
-### Phase 1 — Foundation & Design System
-- Enable Lovable Cloud.
-- Cairo font via `<link>` in `__root.tsx`; RTL (`dir="rtl"`, `lang="ar"`).
-- Design tokens in `src/styles.css`: Elsewedy red `#E30613`, orange `#FF5A2C`, charcoal, white, light gray — all as oklch semantic tokens (`--primary`, `--accent`, gradients, shadows). Notion-style spacious layout utilities.
-- Root layout: app shell with sidebar nav (dashboard, months, all tasks, team, activity, settings) + top bar (search, notification bell, user menu).
-- Root SEO head with app title.
+## Phase 0 — Audit (no code changes)
+Read and confirm current state of:
+- `src/routes/_authenticated/*` (dashboard, tasks, months, team, activity, settings, route.tsx)
+- `src/components/tasks/TasksExplorer.tsx`, `TaskDetailDrawer.tsx`
+- `src/lib/tasks.functions.ts`, `admin.functions.ts`, `i18n.ts`
+- Current DB schema (profiles, user_roles, tasks, task_comments, task_attachments, task_activity, notifications) and existing RLS
+- Sidebar entries, auth flow, notification center
 
-### Phase 2 — Database & RLS
-Migration creates:
-- `app_role` enum (super_admin, admin, sales_manager, sales_executive, design_manager, designer, view_only)
-- `overall_status`, `design_status`, `priority`, `customer_type`, `product_service` enums with the exact Arabic values specified
-- `profiles` (id → auth.users, full_name, email, avatar_url, is_active, created_at)
-- `user_roles` (user_id, role) + `has_role()` SECURITY DEFINER function
-- `tasks` — every column from the spec, plus `task_code` (AUG-0001…), `month_code`, `sales_checklist jsonb`, `design_checklist jsonb`, `is_archived`, `is_demo`, `deleted_at`, timestamps
-- `task_comments`, `task_attachments`, `task_activity`, `notifications`
-- Storage bucket `task-files` (private) with owner-scoped policies
-- RLS on every table:
-  - View Only → SELECT only
-  - Sales Executive → CRUD own tasks (sales fields); can't edit design fields
-  - Sales Manager → all sales tasks
-  - Designer → update design fields on tasks assigned to them + move to design statuses
-  - Design Manager → all design fields, assign designers
-  - Admin/Super Admin → full
-- Trigger: on insert, auto-generate `task_code` from `month_code` + sequence
-- Trigger: on `overall_status='جاهز للتصميم'` insert into designer queue (via activity + notification to Design Manager)
-- Trigger: log every mutation to `task_activity`
-- `GRANT`s per rules
+Goal: reuse existing pieces (e.g. `team.tsx` becomes the new Users & Permissions page; existing `updateTask` server fn extended, not replaced).
 
-### Phase 3 — Auth
-- `/auth` public route: email/password login only, no signup form.
-- Integration-managed `_authenticated` gate (already exists).
-- Session-aware header, sign-out hygiene.
-- Server fn `createUser` (admin-only) for Team page.
+## Phase 1 — Database (additive migration)
+Add ONLY missing pieces, keep everything existing:
 
-### Phase 4 — Task Data Layer (server fns)
-- `listTasks(filters)`, `getTask(id)`, `createTask`, `updateTask` (partial), `archiveTask`, `restoreTask`, `deleteTask` (super admin), `addComment`, `addAttachment`, `listActivity`, `listNotifications`, `markNotificationRead`, `dashboardStats`, `loadDemoData`, `removeDemoData`.
-- All use `requireSupabaseAuth`; RLS enforces role rules; server also re-validates role for destructive ops.
+- `profiles`: add `phone text`, `avatar_url` (exists), `department text`, `job_title text`, `branch text`, `last_sign_in_at timestamptz`, `archived_at timestamptz`.
+- `user_permission_overrides` (new): `(user_id, permission_key, value)` with RLS restricted to admins.
+- `task_attachments`: add `file_size bigint`, `mime_type text`, `version int default 1`, and keep `kind` for category (مرجع/مبدئي/تعديل/مراجعة/نهائية).
+- `task_comments`: add `parent_id uuid null`, `is_internal bool default false`, `is_pinned bool default false`, `edited_at timestamptz`.
+- `task_activity`: already logs field diffs via trigger; extend trigger to also diff `priority`, `delivery_due_date`, `final_version_url`, `actual_delivery_date`, `delivered`.
+- Guard function `prevent_last_super_admin()` — trigger on `user_roles` DELETE/UPDATE and on `profiles.is_active` UPDATE to block removing/disabling the last active super_admin.
+- Guard function on tasks: validate transitions to `جاهز للتصميم`, `بانتظار الاعتماد`, `مكتمل` (checks required fields; raises Arabic exception if missing). Runs in a BEFORE UPDATE trigger.
+- RLS refinements:
+  - Sales fields: restrict UPDATE of Sales columns to admins/sales roles via a column-level trigger (Postgres RLS is row-level, so use a BEFORE UPDATE trigger `enforce_task_field_permissions()` that raises when a non-authorized role tries to change protected columns).
+  - Designers can only update design columns on tasks where `designer_id = auth.uid()` OR they are design_manager/admin.
+- Indices on `tasks(designer_id)`, `tasks(sales_owner_id)`, `tasks(overall_status)`, `task_activity(task_id, created_at desc)`.
 
-### Phase 5 — Views & Pages
-- **Dashboard** (`/`): real KPI cards (total, at sales, ready for design, in design, awaiting approval, completed, overdue, completion %); charts by month, status, owner (recharts).
-- **Month pages** (`/months/aug` … `/dec`): hero cover (generated image per month), icon, Quran verse, motivational line, workflow sketch (SVG), then task table filtered to that month.
-- **All Tasks** (`/tasks`): full-featured table (search, sort, pagination, column visibility, filters on every important field), plus view switcher: Table / Kanban / My Tasks / Delayed / Completed.
-- **Task detail drawer + `/tasks/$id` page**: all fields inline-editable per role, sales & design checklists, comments, attachments, activity timeline, final-file upload, delete-confirm, archive/restore.
-- **Add Task**: multi-step form (Basic → Sales → Design brief → Review) with Zod validation.
-- **Team** (`/team`): list users, invite/create (admin), change role, deactivate.
-- **Activity** (`/activity`): global timeline with filters.
-- **Settings** (`/settings`): profile, demo data controls (super admin), timezone display (fixed Africa/Cairo).
-- **Notifications**: bell dropdown + `/notifications`.
+All GRANTs preserved for new tables.
 
-### Phase 6 — Polish & Verify
-- Overdue detection (delivery date < today AND not completed) → red badge + delayed view.
-- CSV export of current filtered rows.
-- All dates rendered Africa/Cairo, 12-hour with ص/م via `Intl.DateTimeFormat`.
-- Manual QA via Playwright: log in as seeded admin, create task, move through statuses, verify designer queue updates, verify RLS by switching roles, verify export, verify demo-data toggle.
-- Typecheck + build clean; no dead buttons.
+## Phase 2 — Server functions
+Extend `src/lib/tasks.functions.ts` and `admin.functions.ts`:
 
-### Technical notes
-- Stack: TanStack Start + Query, Supabase (Lovable Cloud), shadcn/ui, recharts, zod, react-hook-form, @dnd-kit for Kanban, date-fns-tz for Cairo tz.
-- Table: TanStack Table for sort/filter/visibility/pagination.
-- All Arabic labels stored as constants in `src/lib/i18n.ts`.
-- Enums duplicated as TS unions generated from `src/integrations/supabase/types.ts`.
+- `quickUpdateTask({id, patch})` — same as updateTask but batches allowed fields and returns diff.
+- `archiveTask`, `restoreTask`, `reopenTask({id, note})`, `stopTask({id, reason})`.
+- `listTaskFiles`, `uploadTaskFile` (uses new Supabase storage bucket `task-files`), `deleteTaskFile`.
+- `addComment` extended: `parent_id`, `is_internal`; new `editComment`, `deleteComment`, `pinComment`.
+- Admin: `adminUpdateProfile`, `adminResetPassword` (sends reset email), `adminArchiveUser`, `adminSetPermissionOverride`, `adminListPermissionMatrix`.
+- Every mutation goes through `requireSupabaseAuth`; role checks re-verified server-side using `has_role`/`has_any_role` RPCs.
 
-### Deliverable scope note
-This will land as ~40–60 files across 5–6 turns of work. I'll implement Phase 1+2+3 first (foundation, DB, auth, seeded admin) so you can log in and see the shell, then Phase 4+5 (data layer + all views), then Phase 6 (polish + QA). Approve to proceed, or tell me what to cut/change.
+## Phase 3 — Storage
+Create `task-files` private bucket + RLS on `storage.objects` allowing authenticated users to read/write files under `tasks/<task_id>/...` when they can access the task.
+
+## Phase 4 — Users & Permissions page
+Rename/repurpose `src/routes/_authenticated/team.tsx` → keep route, upgrade content. Route gated to super_admin/admin via `beforeLoad` calling a new `getMyRoles` server fn (redirect otherwise). Sidebar item shown conditionally.
+
+- Header + KPI cards (total, active, suspended, sales team, design team, managers).
+- Search + filters (role, department, status, branch).
+- Table with all requested columns and row actions (view/edit/change role/reset password/suspend/reactivate/archive) with confirm dialogs.
+- 3-step "Add User" dialog (personal / access / confirm) calling existing `adminCreateUser` extended with new profile fields.
+- Guards: cannot self-delete/disable, cannot remove last super_admin (enforced client + DB trigger).
+- Tab 2 `مصفوفة الصلاحيات`: matrix of permissions × roles with 4 states (سماح كامل / المهام الخاصة فقط / قراءة فقط / غير مسموح). Super_admin can edit overrides; changes persisted to `user_permission_overrides` (per-user) plus a base matrix constant in `src/lib/permissions.ts`.
+
+## Phase 5 — Task Details redesign
+Replace `TaskDetailDrawer.tsx` internals with:
+- Rich header (name, code, client, status, priority, owners, due date, overdue badge, last-updated).
+- Header actions: تعديل التاسك / تحديث سريع / إضافة تعليق / رفع ملف / نسخ الرابط / أرشفة.
+- Tabs (shadcn `Tabs`): Overview / Sales / Design / Files / Comments / Activity.
+- Overview shows progress, checklists, latest comment/file/activity.
+- Sales & Design tabs render form sections with field-level permission gating using `src/lib/permissions.ts` helper `canEditField(role, field)`.
+- `تحديث سريع` dialog: compact form (overall_status, design_status, priority, sales_owner, designer, due_date, note). Shows diff summary before save; saves in one call.
+- `تعديل التاسك` dialog: full sectioned form, unsaved-changes tracker (blocks close), disabled save until dirty, validation, single Save button.
+- Comments tab: threaded, edit/delete own, pin (managers), internal notes toggle.
+- Files tab: drag-drop upload, category select, list w/ preview/download/delete, versioning.
+- Activity tab: Arabic timeline with old→new diffs.
+
+## Phase 6 — Sidebar / permissions plumbing
+- `src/lib/permissions.ts`: PERMISSIONS constant, PERMISSION_MATRIX default, `useMyPermissions()` hook that reads roles + overrides from server fn.
+- Sidebar filters items using `useMyPermissions()`.
+- `_authenticated/route.tsx` sidebar: add "المستخدمون والصلاحيات" (Users icon, Shield accent) for admins only.
+
+## Phase 7 — Polish
+- Confirm dialogs (shadcn AlertDialog) for all destructive actions.
+- Arabic toasts everywhere.
+- Skeletons on all lists.
+- Mobile: task drawer becomes full-screen sheet on <768px; table falls back to card list.
+- Africa/Cairo tz in `format.ts` (already partially present) — audit and unify to 12h Arabic.
+
+## Phase 8 — Verify
+- Run typecheck + build.
+- Manual role walk-through via Playwright against localhost for: admin creates user, sales creates task, designer updates status, protected field write blocked at DB, quick update, full edit, activity written with diffs.
+
+## Technical notes
+- Field-level permissions are enforced twice: UI (`canEditField`) and DB trigger `enforce_task_field_permissions` — the DB is the source of truth.
+- No service-role key in browser; admin ops stay in `requireSupabaseAuth` server functions that verify role via `has_role` before loading `supabaseAdmin` inside the handler (per repo rules).
+- Migrations are additive only — no `DROP` on existing tables/columns.
+- `user_roles` behavior preserved; multi-role support kept.
+
+## What I will NOT change
+- Existing Cairo/RTL styling and color tokens.
+- Dashboard math and month pages (only bug fixes if found in audit).
+- Existing auth flow / auth.tsx bootstrap.
+- Existing routes; `team.tsx` is upgraded in place (URL stays `/team`, label becomes "المستخدمون والصلاحيات") unless you prefer a new `/users` route.
+
+Confirm and I will start with the audit reads, then the migration, then code.
