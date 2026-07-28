@@ -1,10 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { loadDemoData, removeDemoData } from "@/lib/admin.functions";
+import { getNotificationPrefs, saveNotificationPrefs } from "@/lib/tasks.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Slider } from "@/components/ui/slider";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { useEffect, useState } from "react";
+import { playNormal, playSiren, unlockAudio } from "@/lib/notification-sound";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 export const Route = createFileRoute("/_authenticated/settings")({
@@ -16,6 +22,29 @@ function SettingsPage() {
   const qc = useQueryClient();
   const loadFn = useServerFn(loadDemoData);
   const removeFn = useServerFn(removeDemoData);
+  const prefsFn = useServerFn(getNotificationPrefs);
+  const savePrefsFn = useServerFn(saveNotificationPrefs);
+
+  const { data: prefs } = useQuery({ queryKey: ["notif-prefs"], queryFn: () => prefsFn() });
+
+  const [soundsEnabled, setSoundsEnabled] = useState(true);
+  const [volNormal, setVolNormal] = useState(60);
+  const [volUrgent, setVolUrgent] = useState(90);
+
+  useEffect(() => {
+    if (!prefs) return;
+    setSoundsEnabled(prefs.sounds_enabled !== false);
+    setVolNormal(prefs.volume_normal ?? 60);
+    setVolUrgent(prefs.volume_urgent ?? 90);
+  }, [prefs]);
+
+  const save = useMutation({
+    mutationFn: () => savePrefsFn({ data: {
+      sounds_enabled: soundsEnabled, volume_normal: volNormal, volume_urgent: volUrgent,
+    }}),
+    onSuccess: () => { toast.success("تم حفظ التفضيلات"); qc.invalidateQueries({ queryKey: ["notif-prefs"] }); },
+    onError: (e: any) => toast.error(e.message),
+  });
 
   const load = useMutation({
     mutationFn: () => loadFn(),
@@ -32,8 +61,33 @@ function SettingsPage() {
     <div className="space-y-6 max-w-2xl">
       <div>
         <h1 className="text-2xl font-bold">الإعدادات</h1>
-        <p className="text-sm text-muted-foreground">تكوين النظام والبيانات التجريبية</p>
+        <p className="text-sm text-muted-foreground">تكوين النظام والإشعارات والبيانات التجريبية</p>
       </div>
+
+      <Card className="card-soft">
+        <CardHeader><CardTitle className="text-base">تنبيهات الصوت</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <Label>تشغيل صوت الإشعارات</Label>
+            <Switch checked={soundsEnabled} onCheckedChange={(v) => { setSoundsEnabled(v); unlockAudio(); }} />
+          </div>
+          <div className="space-y-2">
+            <Label className="text-sm">مستوى الصوت العادي: {volNormal}%</Label>
+            <Slider min={0} max={100} value={[volNormal]} onValueChange={([v]) => setVolNormal(v)} />
+            <Button size="sm" variant="outline" onClick={() => { unlockAudio(); playNormal(volNormal / 100); }}>
+              تجربة
+            </Button>
+          </div>
+          <div className="space-y-2">
+            <Label className="text-sm">مستوى صوت الصفارة (عاجل): {volUrgent}%</Label>
+            <Slider min={0} max={100} value={[volUrgent]} onValueChange={([v]) => setVolUrgent(v)} />
+            <Button size="sm" variant="outline" onClick={() => { unlockAudio(); playSiren(volUrgent / 100); }}>
+              تجربة الصفارة
+            </Button>
+          </div>
+          <Button onClick={() => save.mutate()} disabled={save.isPending}>حفظ التفضيلات</Button>
+        </CardContent>
+      </Card>
 
       <Card className="card-soft">
         <CardHeader><CardTitle className="text-base">المنطقة الزمنية</CardTitle></CardHeader>
