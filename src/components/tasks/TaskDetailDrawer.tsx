@@ -6,6 +6,7 @@ import {
   listComments, addComment, editComment, deleteComment, pinComment,
   listActivity, listProfiles, myRoles,
 } from "@/lib/tasks.functions";
+import { getTaskStatusOptions } from "@/lib/departments.functions";
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle,
 } from "@/components/ui/sheet";
@@ -88,6 +89,25 @@ export function TaskDetailDrawer({ taskId, open, onClose }: { taskId: string | n
   }, [open, taskId, taskFetched, task, qc, onClose]);
   const { data: profiles = [] } = useQuery({ queryKey: ["profiles-lite"], queryFn: () => profilesFn() });
   const { data: roles = [] } = useQuery({ queryKey: ["my-roles"], queryFn: () => rolesFn() });
+
+  const statusesFn = useServerFn(getTaskStatusOptions);
+  const { data: dynStatuses } = useQuery({
+    enabled: !!taskId,
+    queryKey: ["task-statuses", taskId],
+    queryFn: () => statusesFn({ data: { task_id: taskId! } }),
+  });
+  // Merge dynamic (department/type) statuses with legacy enum so old tasks still render.
+  const statusOptions = useMemo<{ value: string; color?: string }[]>(() => {
+    const seen = new Set<string>();
+    const out: { value: string; color?: string }[] = [];
+    (dynStatuses ?? []).forEach((s: any) => {
+      const v = String(s.label_ar);
+      if (!seen.has(v)) { seen.add(v); out.push({ value: v, color: s.color }); }
+    });
+    OVERALL_STATUS.forEach((v) => { if (!seen.has(v)) { seen.add(v); out.push({ value: v }); } });
+    if (task?.overall_status && !seen.has(task.overall_status)) out.push({ value: task.overall_status });
+    return out;
+  }, [dynStatuses, task?.overall_status]);
 
   const nameById = useMemo(() => new Map(profiles.map((p) => [p.id, p.full_name || p.email])), [profiles]);
 
@@ -217,10 +237,10 @@ export function TaskDetailDrawer({ taskId, open, onClose }: { taskId: string | n
       </Sheet>
 
       {quickOpen && (
-        <QuickUpdateDialog task={task} profiles={profiles} onClose={() => setQuickOpen(false)} />
+        <QuickUpdateDialog task={task} profiles={profiles} statusOptions={statusOptions} onClose={() => setQuickOpen(false)} />
       )}
       {editOpen && (
-        <FullEditDialog task={task} profiles={profiles} canEdit={canEdit} onClose={() => setEditOpen(false)} />
+        <FullEditDialog task={task} profiles={profiles} canEdit={canEdit} statusOptions={statusOptions} onClose={() => setEditOpen(false)} />
       )}
       <AlertDialog open={archiveConfirm} onOpenChange={setArchiveConfirm}>
         <AlertDialogContent dir="rtl">
@@ -629,7 +649,7 @@ function describeActivity(a: any): string {
 
 /* ---------------- Quick Update Dialog ---------------- */
 
-function QuickUpdateDialog({ task, profiles, onClose }: { task: any; profiles: any[]; onClose: () => void }) {
+function QuickUpdateDialog({ task, profiles, statusOptions, onClose }: { task: any; profiles: any[]; statusOptions: { value: string; color?: string }[]; onClose: () => void }) {
   const qc = useQueryClient();
   const quickFn = useServerFn(quickUpdateTask);
   const [form, setForm] = useState({
@@ -702,7 +722,7 @@ function QuickUpdateDialog({ task, profiles, onClose }: { task: any; profiles: a
             <MiniField label="الحالة العامة">
               <Select value={form.overall_status} onValueChange={(v) => setForm({ ...form, overall_status: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{OVERALL_STATUS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                <SelectContent>{statusOptions.map((s) => <SelectItem key={s.value} value={s.value}>{s.value}</SelectItem>)}</SelectContent>
               </Select>
             </MiniField>
             <MiniField label="حالة التصميم">
@@ -790,8 +810,8 @@ function QuickUpdateDialog({ task, profiles, onClose }: { task: any; profiles: a
 /* ---------------- Full Edit Dialog ---------------- */
 
 function FullEditDialog({
-  task, profiles, canEdit, onClose,
-}: { task: any; profiles: any[]; canEdit: (f: string) => boolean; onClose: () => void }) {
+  task, profiles, canEdit, statusOptions, onClose,
+}: { task: any; profiles: any[]; canEdit: (f: string) => boolean; statusOptions: { value: string; color?: string }[]; onClose: () => void }) {
   const qc = useQueryClient();
   const updFn = useServerFn(updateTask);
   const [form, setForm] = useState<any>({ ...task });
@@ -857,7 +877,7 @@ function FullEditDialog({
                 <Select value={form.overall_status} disabled={!canEdit("overall_status")}
                   onValueChange={(v) => upd("overall_status", v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{OVERALL_STATUS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                  <SelectContent>{statusOptions.map((s) => <SelectItem key={s.value} value={s.value}>{s.value}</SelectItem>)}</SelectContent>
                 </Select>
               </MiniField>
             </section>
