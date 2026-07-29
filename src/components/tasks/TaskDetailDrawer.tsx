@@ -6,6 +6,7 @@ import {
   listComments, addComment, editComment, deleteComment, pinComment,
   listActivity, listProfiles, myRoles,
 } from "@/lib/tasks.functions";
+import { getTaskStatusOptions } from "@/lib/departments.functions";
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle,
 } from "@/components/ui/sheet";
