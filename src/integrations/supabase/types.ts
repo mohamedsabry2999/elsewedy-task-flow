@@ -69,6 +69,7 @@ export type Database = {
           color: string
           created_at: string
           created_by: string | null
+          default_template_id: string | null
           description: string | null
           icon: string
           id: string
@@ -83,6 +84,7 @@ export type Database = {
           color?: string
           created_at?: string
           created_by?: string | null
+          default_template_id?: string | null
           description?: string | null
           icon?: string
           id?: string
@@ -97,6 +99,7 @@ export type Database = {
           color?: string
           created_at?: string
           created_by?: string | null
+          default_template_id?: string | null
           description?: string | null
           icon?: string
           id?: string
@@ -107,7 +110,15 @@ export type Database = {
           sort_order?: number
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "departments_default_template_id_fkey"
+            columns: ["default_template_id"]
+            isOneToOne: false
+            referencedRelation: "task_templates"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       months: {
         Row: {
