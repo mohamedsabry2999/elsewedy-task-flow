@@ -299,3 +299,49 @@ export const listTaskAssignments = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return rows ?? [];
   });
+
+// ---------- DEPARTMENT TEMPLATE / DYNAMIC STATUSES ----------
+// Load the department's default template so its status list can be edited.
+export const getDepartmentTemplate = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { department_id: string }) => d)
+  .handler(async ({ data, context }) => {
+    const { data: dept, error: e1 } = await context.supabase
+      .from("departments").select("id, name_ar, default_template_id")
+      .eq("id", data.department_id).maybeSingle();
+    if (e1) throw new Error(e1.message);
+    if (!dept?.default_template_id) return null;
+    const { data: tpl, error: e2 } = await context.supabase
+      .from("task_templates").select("*").eq("id", dept.default_template_id).maybeSingle();
+    if (e2) throw new Error(e2.message);
+    return tpl;
+  });
+
+// Resolve the status list a task should use: task_type template → department template → null.
+export const getTaskStatusOptions = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { task_id: string }) => d)
+  .handler(async ({ data, context }) => {
+    const { data: task } = await context.supabase
+      .from("tasks").select("id, department_id, task_type_id").eq("id", data.task_id).maybeSingle();
+    if (!task) return null;
+
+    let templateId: string | null = null;
+    if (task.task_type_id) {
+      const { data: tt } = await context.supabase
+        .from("task_types").select("template_id").eq("id", task.task_type_id).maybeSingle();
+      templateId = (tt as any)?.template_id ?? null;
+    }
+    if (!templateId && task.department_id) {
+      const { data: dept } = await context.supabase
+        .from("departments").select("default_template_id").eq("id", task.department_id).maybeSingle();
+      templateId = (dept as any)?.default_template_id ?? null;
+    }
+    if (!templateId) return null;
+    const { data: tpl } = await context.supabase
+      .from("task_templates").select("statuses_config").eq("id", templateId).maybeSingle();
+    const arr = Array.isArray((tpl as any)?.statuses_config) ? ((tpl as any).statuses_config as any[]) : [];
+    return arr
+      .filter((s) => s && typeof s.label_ar === "string" && s.label_ar.trim().length > 0)
+      .sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0));
+  });
