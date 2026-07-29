@@ -810,8 +810,8 @@ function QuickUpdateDialog({ task, profiles, statusOptions, onClose }: { task: a
 /* ---------------- Full Edit Dialog ---------------- */
 
 function FullEditDialog({
-  task, profiles, canEdit, onClose,
-}: { task: any; profiles: any[]; canEdit: (f: string) => boolean; onClose: () => void }) {
+  task, profiles, canEdit, statusOptions, onClose,
+}: { task: any; profiles: any[]; canEdit: (f: string) => boolean; statusOptions: { value: string; color?: string }[]; onClose: () => void }) {
   const qc = useQueryClient();
   const updFn = useServerFn(updateTask);
   const [form, setForm] = useState<any>({ ...task });
