@@ -90,6 +90,25 @@ export function TaskDetailDrawer({ taskId, open, onClose }: { taskId: string | n
   const { data: profiles = [] } = useQuery({ queryKey: ["profiles-lite"], queryFn: () => profilesFn() });
   const { data: roles = [] } = useQuery({ queryKey: ["my-roles"], queryFn: () => rolesFn() });
 
+  const statusesFn = useServerFn(getTaskStatusOptions);
+  const { data: dynStatuses } = useQuery({
+    enabled: !!taskId,
+    queryKey: ["task-statuses", taskId],
+    queryFn: () => statusesFn({ data: { id: taskId! } as any }),
+  });
+  // Merge dynamic (department/type) statuses with legacy enum so old tasks still render.
+  const statusOptions = useMemo<{ value: string; color?: string }[]>(() => {
+    const seen = new Set<string>();
+    const out: { value: string; color?: string }[] = [];
+    (dynStatuses ?? []).forEach((s: any) => {
+      const v = String(s.label_ar);
+      if (!seen.has(v)) { seen.add(v); out.push({ value: v, color: s.color }); }
+    });
+    OVERALL_STATUS.forEach((v) => { if (!seen.has(v)) { seen.add(v); out.push({ value: v }); } });
+    if (task?.overall_status && !seen.has(task.overall_status)) out.push({ value: task.overall_status });
+    return out;
+  }, [dynStatuses, task?.overall_status]);
+
   const nameById = useMemo(() => new Map(profiles.map((p) => [p.id, p.full_name || p.email])), [profiles]);
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
