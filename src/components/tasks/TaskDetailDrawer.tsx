@@ -877,7 +877,7 @@ function FullEditDialog({
                 <Select value={form.overall_status} disabled={!canEdit("overall_status")}
                   onValueChange={(v) => upd("overall_status", v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{OVERALL_STATUS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                  <SelectContent>{statusOptions.map((s) => <SelectItem key={s.value} value={s.value}>{s.value}</SelectItem>)}</SelectContent>
                 </Select>
               </MiniField>
             </section>
