@@ -1194,7 +1194,7 @@ import {
   listDepartments, createDepartment, updateDepartment, deleteDepartment,
   listDepartmentMembers, addDepartmentMember, updateDepartmentMember, removeDepartmentMember,
   listAssignableUsers, listTaskTypes, createTaskType, updateTaskType, deleteTaskType,
-  getDepartmentCapabilities,
+  getDepartmentCapabilities, getDepartmentTemplate,
 } from "@/lib/departments.functions";
 import { Building2, Users, Search, Palette, ClipboardList } from "lucide-react";
 
