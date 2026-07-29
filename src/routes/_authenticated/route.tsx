@@ -7,10 +7,11 @@ import { listNavMonths, canManageStructure } from "@/lib/structure.functions";
 import { ROLE_LABEL, MONTHS, type AppRole } from "@/lib/i18n";
 import { useEffect, useRef, useState } from "react";
 import {
-  LayoutDashboard, ListTodo, Calendar, ShieldCheck, History, Settings, LogOut, Bell, Menu, Volume2, VolumeX, CheckCheck, ExternalLink, X, SlidersHorizontal,
+  LayoutDashboard, ListTodo, Calendar, ShieldCheck, History, Settings, LogOut, Bell, Menu, Volume2, VolumeX, CheckCheck, ExternalLink, X, SlidersHorizontal, ChevronDown,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger,
