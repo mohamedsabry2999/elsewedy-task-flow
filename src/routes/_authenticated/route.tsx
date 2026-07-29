@@ -298,7 +298,7 @@ function TopBar({ onSignOut, onMenuClick }: { onSignOut: () => void; onMenuClick
           </Button>
           <BrandMark size="sm" className="lg:hidden" />
           <div className="hidden sm:block text-sm text-muted-foreground">
-            دار السويدي للطباعة — نظام إدارة مهام السيلز والتصميم
+            دار السويدي للطباعة — نظام إدارة المهام للأقسام
           </div>
         </div>
         <div className="flex items-center gap-1">
