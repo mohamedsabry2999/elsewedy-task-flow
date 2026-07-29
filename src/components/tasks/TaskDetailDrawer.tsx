@@ -94,7 +94,7 @@ export function TaskDetailDrawer({ taskId, open, onClose }: { taskId: string | n
   const { data: dynStatuses } = useQuery({
     enabled: !!taskId,
     queryKey: ["task-statuses", taskId],
-    queryFn: () => statusesFn({ data: { id: taskId! } as any }),
+    queryFn: () => statusesFn({ data: { task_id: taskId! } }),
   });
   // Merge dynamic (department/type) statuses with legacy enum so old tasks still render.
   const statusOptions = useMemo<{ value: string; color?: string }[]>(() => {
