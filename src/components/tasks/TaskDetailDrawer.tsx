@@ -649,7 +649,7 @@ function describeActivity(a: any): string {
 
 /* ---------------- Quick Update Dialog ---------------- */
 
-function QuickUpdateDialog({ task, profiles, onClose }: { task: any; profiles: any[]; onClose: () => void }) {
+function QuickUpdateDialog({ task, profiles, statusOptions, onClose }: { task: any; profiles: any[]; statusOptions: { value: string; color?: string }[]; onClose: () => void }) {
   const qc = useQueryClient();
   const quickFn = useServerFn(quickUpdateTask);
   const [form, setForm] = useState({
