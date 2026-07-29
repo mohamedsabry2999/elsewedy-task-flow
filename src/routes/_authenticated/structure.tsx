@@ -1439,6 +1439,140 @@ function EditDepartmentDialog({ dept, onClose }: { dept: any; onClose: () => voi
   );
 }
 
+function DepartmentStatusesButton({ dept }: { dept: any }) {
+  const tplFn = useServerFn(getDepartmentTemplate);
+  const [open, setOpen] = useState(false);
+  const { data: tpl, isFetching } = useQuery({
+    queryKey: ["dept-template", dept.id, open],
+    queryFn: () => tplFn({ data: { department_id: dept.id } }),
+    enabled: open,
+    staleTime: 0,
+  });
+  return (
+    <>
+      <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+        <Flag className="h-3.5 w-3.5 ml-1" /> الحالات
+      </Button>
+      {open && (
+        isFetching || !tpl ? (
+          <Dialog open onOpenChange={(v) => !v && setOpen(false)}>
+            <DialogContent dir="rtl" className="max-w-sm">
+              <DialogHeader><DialogTitle>حالات {dept.name_ar}</DialogTitle></DialogHeader>
+              <div className="text-sm text-muted-foreground py-4 text-center">
+                {isFetching ? "جارٍ التحميل…" : "لا يوجد قالب افتراضي لهذا القسم."}
+              </div>
+            </DialogContent>
+          </Dialog>
+        ) : (
+          <DepartmentStatusesInlineDialog template={tpl} onClose={() => setOpen(false)} />
+        )
+      )}
+    </>
+  );
+}
+
+// Same editor as StatusesEditorDialog but opened programmatically (no trigger button).
+function DepartmentStatusesInlineDialog({ template, onClose }: { template: any; onClose: () => void }) {
+  const qc = useQueryClient();
+  const updFn = useServerFn(updateTemplate);
+  const initial: StatusDef[] = Array.isArray(template.statuses_config) ? template.statuses_config : [];
+  const [statuses, setStatuses] = useState<StatusDef[]>(
+    [...initial].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+  );
+  const mut = useMutation({
+    mutationFn: () => updFn({ data: { id: template.id, patch: {
+      statuses_config: statuses.map((s, i) => ({ ...s, order: i + 1 })),
+    } } }),
+    onSuccess: () => {
+      toast.success("تم حفظ حالات القسم");
+      qc.invalidateQueries({ queryKey: ["structure-templates"] });
+      qc.invalidateQueries({ queryKey: ["dept-template"] });
+      qc.invalidateQueries({ queryKey: ["task-statuses"] });
+      onClose();
+    },
+    onError: (e: any) => toast.error(e.message || "فشل الحفظ"),
+  });
+  const addStatus = () => {
+    const idx = statuses.length + 1;
+    setStatuses((p) => [...p, { key: `status_${idx}`, label_ar: `حالة ${idx}`, color: "#94a3b8", order: idx }]);
+  };
+  const updateStatus = (i: number, patch: Partial<StatusDef>) =>
+    setStatuses((p) => p.map((s, idx) => idx === i ? { ...s, ...patch } : s));
+  const removeStatus = (i: number) => setStatuses((p) => p.filter((_, idx) => idx !== i));
+  const move = (i: number, dir: -1 | 1) => {
+    const j = i + dir;
+    if (j < 0 || j >= statuses.length) return;
+    setStatuses((p) => { const arr = [...p]; [arr[i], arr[j]] = [arr[j], arr[i]]; return arr; });
+  };
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent dir="rtl" className="max-w-3xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>حالات القسم — {template.name}</DialogTitle>
+        </DialogHeader>
+        <div className="text-xs text-muted-foreground pb-2">
+          هذه الحالات تظهر في كل تاسك مرتبط بهذا القسم. يمكنك إضافة أي عدد يناسب طبيعة عمل القسم.
+        </div>
+        {statuses.length === 0 ? (
+          <div className="text-sm text-muted-foreground text-center py-6">
+            لا توجد حالات بعد. اضغط "إضافة حالة".
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {statuses.map((s, i) => (
+              <div key={i} className="border rounded-md p-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="flex flex-col gap-0.5">
+                    <Button size="sm" variant="ghost" className="h-5 w-5 p-0" onClick={() => move(i, -1)} disabled={i === 0}>
+                      <ArrowUp className="h-3 w-3" />
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-5 w-5 p-0" onClick={() => move(i, 1)} disabled={i === statuses.length - 1}>
+                      <ArrowDown className="h-3 w-3" />
+                    </Button>
+                  </div>
+                  <div className="h-6 w-6 rounded-full border" style={{ background: s.color ?? "#94a3b8" }} />
+                  <Input
+                    value={s.label_ar}
+                    onChange={(e) => updateStatus(i, { label_ar: e.target.value })}
+                    onBlur={(e) => { if (!s.key || s.key.startsWith("status_")) updateStatus(i, { key: slugifyKey(e.target.value) }); }}
+                    className="h-8 flex-1" placeholder="اسم الحالة"
+                  />
+                  <Input type="color" className="h-8 w-14 p-1" value={s.color ?? "#94a3b8"}
+                         onChange={(e) => updateStatus(i, { color: e.target.value })} />
+                  <Button size="sm" variant="ghost" className="h-8 text-red-600" onClick={() => removeStatus(i)}>
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+                <div className="grid grid-cols-3 gap-2 pr-8 items-center">
+                  <div>
+                    <Label className="text-xs">المفتاح</Label>
+                    <Input value={s.key} onChange={(e) => updateStatus(i, { key: slugifyKey(e.target.value) })}
+                      className="h-8 font-mono text-xs" />
+                  </div>
+                  <label className="flex items-center gap-2 text-xs mt-4">
+                    <Checkbox checked={!!s.is_terminal} onCheckedChange={(v) => updateStatus(i, { is_terminal: v === true })} />
+                    حالة نهائية
+                  </label>
+                  <label className="flex items-center gap-2 text-xs mt-4">
+                    <Checkbox checked={!!s.requires_reason} onCheckedChange={(v) => updateStatus(i, { requires_reason: v === true })} />
+                    تتطلب سببًا
+                  </label>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        <DialogFooter className="flex-wrap gap-2">
+          <Button variant="outline" onClick={addStatus}><Plus className="h-4 w-4 ml-1" />إضافة حالة</Button>
+          <div className="flex-1" />
+          <Button variant="ghost" onClick={onClose}>إلغاء</Button>
+          <Button onClick={() => mut.mutate()} disabled={mut.isPending}>حفظ الحالات</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function ArchiveDeptButton({ dept }: { dept: any }) {
   const qc = useQueryClient();
   const updateFn = useServerFn(updateDepartment);
