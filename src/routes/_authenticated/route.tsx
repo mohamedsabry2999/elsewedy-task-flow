@@ -7,10 +7,11 @@ import { listNavMonths, canManageStructure } from "@/lib/structure.functions";
 import { ROLE_LABEL, MONTHS, type AppRole } from "@/lib/i18n";
 import { useEffect, useRef, useState } from "react";
 import {
-  LayoutDashboard, ListTodo, Calendar, ShieldCheck, History, Settings, LogOut, Bell, Menu, Volume2, VolumeX, CheckCheck, ExternalLink, X, SlidersHorizontal,
+  LayoutDashboard, ListTodo, Calendar, ShieldCheck, History, Settings, LogOut, Bell, Menu, Volume2, VolumeX, CheckCheck, ExternalLink, X, SlidersHorizontal, ChevronDown,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger,
@@ -135,56 +136,68 @@ function SidebarBody({ roles, onNavigate }: { roles: string[]; onNavigate: () =>
         )}
       </nav>
 
-      <div className="mt-2 space-y-3 overflow-y-auto">
-        {useLegacy ? (
-          <div>
-            <div className="px-3 pb-2 text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-              <Calendar className="h-3 w-3" /> شهور 2026
-            </div>
-            <div className="flex flex-col gap-1">
-              {MONTHS.map((m) => {
-                const to = `/months/${m.slug}` as const;
-                const active = location.pathname === to;
-                return (
-                  <Link key={m.slug} to={to} onClick={onNavigate}
-                    className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm ${
-                      active ? "bg-primary/10 text-primary font-semibold" : "hover:bg-sidebar-accent"
-                    }`}>
-                    <span>{m.emoji}</span> <span>{m.label}</span>
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        ) : (
-          years.map((y: any) => {
-            const yMonths = monthsByYear.get(y.id) ?? [];
-            if (yMonths.length === 0) return null;
-            return (
-              <div key={y.id}>
-                <div className="px-3 pb-2 text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                  <Calendar className="h-3 w-3" /> شهور {y.year}
-                  {y.is_default && <Badge className="bg-emerald-100 text-emerald-800 text-[10px] py-0">افتراضية</Badge>}
+      <div className="mt-2 space-y-2 overflow-y-auto">
+        <Collapsible defaultOpen>
+          <CollapsibleTrigger asChild>
+            <button className="group w-full flex items-center justify-between rounded-lg px-3 py-2 text-xs uppercase tracking-wider text-muted-foreground hover:bg-sidebar-accent transition">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-3 w-3" /> السنوات والشهور
+              </div>
+              <ChevronDown className="h-3 w-3 transition-transform group-data-[state=open]:rotate-180" />
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="space-y-2 pr-1">
+            {useLegacy ? (
+              <div>
+                <div className="px-3 pb-1 text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                  شهور 2026
                 </div>
                 <div className="flex flex-col gap-1">
-                  {yMonths.map((m: any) => {
+                  {MONTHS.map((m) => {
                     const to = `/months/${m.slug}` as const;
                     const active = location.pathname === to;
                     return (
-                      <Link key={m.id} to={to} onClick={onNavigate}
+                      <Link key={m.slug} to={to} onClick={onNavigate}
                         className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm ${
                           active ? "bg-primary/10 text-primary font-semibold" : "hover:bg-sidebar-accent"
                         }`}>
-                        <span>{m.emoji ?? "📅"}</span>
-                        <span>{m.name_ar}</span>
+                        <span>{m.emoji}</span> <span>{m.label}</span>
                       </Link>
                     );
                   })}
                 </div>
               </div>
-            );
-          })
-        )}
+            ) : (
+              years.map((y: any) => {
+                const yMonths = monthsByYear.get(y.id) ?? [];
+                if (yMonths.length === 0) return null;
+                return (
+                  <div key={y.id}>
+                    <div className="px-3 pb-1 text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                      <Calendar className="h-3 w-3" /> شهور {y.year}
+                      {y.is_default && <Badge className="bg-emerald-100 text-emerald-800 text-[10px] py-0">افتراضية</Badge>}
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      {yMonths.map((m: any) => {
+                        const to = `/months/${m.slug}` as const;
+                        const active = location.pathname === to;
+                        return (
+                          <Link key={m.id} to={to} onClick={onNavigate}
+                            className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm ${
+                              active ? "bg-primary/10 text-primary font-semibold" : "hover:bg-sidebar-accent"
+                            }`}>
+                            <span>{m.emoji ?? "📅"}</span>
+                            <span>{m.name_ar}</span>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </CollapsibleContent>
+        </Collapsible>
       </div>
 
       <div className="mt-auto text-xs text-muted-foreground px-3">
@@ -285,7 +298,7 @@ function TopBar({ onSignOut, onMenuClick }: { onSignOut: () => void; onMenuClick
           </Button>
           <BrandMark size="sm" className="lg:hidden" />
           <div className="hidden sm:block text-sm text-muted-foreground">
-            دار السويدي للطباعة — نظام إدارة مهام السيلز والتصميم
+            دار السويدي للطباعة — نظام إدارة المهام للأقسام
           </div>
         </div>
         <div className="flex items-center gap-1">
