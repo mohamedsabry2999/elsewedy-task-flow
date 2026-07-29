@@ -139,11 +139,11 @@ function SidebarBody({ roles, onNavigate }: { roles: string[]; onNavigate: () =>
       <div className="mt-2 space-y-2 overflow-y-auto">
         <Collapsible defaultOpen>
           <CollapsibleTrigger asChild>
-            <button className="w-full flex items-center justify-between rounded-lg px-3 py-2 text-xs uppercase tracking-wider text-muted-foreground hover:bg-sidebar-accent transition">
+            <button className="group w-full flex items-center justify-between rounded-lg px-3 py-2 text-xs uppercase tracking-wider text-muted-foreground hover:bg-sidebar-accent transition">
               <div className="flex items-center gap-2">
                 <Calendar className="h-3 w-3" /> السنوات والشهور
               </div>
-              <ChevronDown className="h-3 w-3 transition-transform data-[state=open]:-rotate-180" />
+              <ChevronDown className="h-3 w-3 transition-transform group-data-[state=open]:rotate-180" />
             </button>
           </CollapsibleTrigger>
           <CollapsibleContent className="space-y-2 pr-1">
