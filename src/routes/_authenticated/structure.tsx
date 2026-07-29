@@ -1282,6 +1282,7 @@ function DepartmentsPanel() {
                 <Button size="sm" variant="outline" onClick={() => setOpenMembers(d.id)}>
                   <Users className="h-3.5 w-3.5 ml-1" /> الأعضاء
                 </Button>
+                {canManage && <DepartmentStatusesButton dept={d} />}
                 {canManage && (
                   <>
                     <Button size="sm" variant="outline" onClick={() => setOpenEdit(d)}>تعديل</Button>
