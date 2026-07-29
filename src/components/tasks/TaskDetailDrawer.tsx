@@ -722,7 +722,7 @@ function QuickUpdateDialog({ task, profiles, statusOptions, onClose }: { task: a
             <MiniField label="الحالة العامة">
               <Select value={form.overall_status} onValueChange={(v) => setForm({ ...form, overall_status: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{OVERALL_STATUS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                <SelectContent>{statusOptions.map((s) => <SelectItem key={s.value} value={s.value}>{s.value}</SelectItem>)}</SelectContent>
               </Select>
             </MiniField>
             <MiniField label="حالة التصميم">
