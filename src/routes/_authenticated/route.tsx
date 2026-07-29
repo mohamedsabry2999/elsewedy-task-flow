@@ -148,51 +148,65 @@ function SidebarBody({ roles, onNavigate }: { roles: string[]; onNavigate: () =>
           </CollapsibleTrigger>
           <CollapsibleContent className="space-y-2 pr-1">
             {useLegacy ? (
-              <div>
-                <div className="px-3 pb-1 text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                  شهور 2026
-                </div>
-                <div className="flex flex-col gap-1">
-                  {MONTHS.map((m) => {
-                    const to = `/months/${m.slug}` as const;
-                    const active = location.pathname === to;
-                    return (
-                      <Link key={m.slug} to={to} onClick={onNavigate}
-                        className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm ${
-                          active ? "bg-primary/10 text-primary font-semibold" : "hover:bg-sidebar-accent"
-                        }`}>
-                        <span>{m.emoji}</span> <span>{m.label}</span>
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
+              <Collapsible defaultOpen>
+                <CollapsibleTrigger asChild>
+                  <button className="group w-full flex items-center justify-between rounded-lg px-3 py-1.5 text-xs uppercase tracking-wider text-muted-foreground hover:bg-sidebar-accent transition">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-3 w-3" /> شهور 2026
+                    </div>
+                    <ChevronDown className="h-3 w-3 transition-transform group-data-[state=open]:rotate-180" />
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="pr-1 mt-1">
+                  <div className="flex flex-col gap-1">
+                    {MONTHS.map((m) => {
+                      const to = `/months/${m.slug}` as const;
+                      const active = location.pathname === to;
+                      return (
+                        <Link key={m.slug} to={to} onClick={onNavigate}
+                          className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm ${
+                            active ? "bg-primary/10 text-primary font-semibold" : "hover:bg-sidebar-accent"
+                          }`}>
+                          <span>{m.emoji}</span> <span>{m.label}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
             ) : (
               years.map((y: any) => {
                 const yMonths = monthsByYear.get(y.id) ?? [];
                 if (yMonths.length === 0) return null;
                 return (
-                  <div key={y.id}>
-                    <div className="px-3 pb-1 text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                      <Calendar className="h-3 w-3" /> شهور {y.year}
-                      {y.is_default && <Badge className="bg-emerald-100 text-emerald-800 text-[10px] py-0">افتراضية</Badge>}
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      {yMonths.map((m: any) => {
-                        const to = `/months/${m.slug}` as const;
-                        const active = location.pathname === to;
-                        return (
-                          <Link key={m.id} to={to} onClick={onNavigate}
-                            className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm ${
-                              active ? "bg-primary/10 text-primary font-semibold" : "hover:bg-sidebar-accent"
-                            }`}>
-                            <span>{m.emoji ?? "📅"}</span>
-                            <span>{m.name_ar}</span>
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  </div>
+                  <Collapsible key={y.id} defaultOpen={y.is_default}>
+                    <CollapsibleTrigger asChild>
+                      <button className="group w-full flex items-center justify-between rounded-lg px-3 py-1.5 text-xs uppercase tracking-wider text-muted-foreground hover:bg-sidebar-accent transition">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-3 w-3" /> شهور {y.year}
+                          {y.is_default && <Badge className="bg-emerald-100 text-emerald-800 text-[10px] py-0">افتراضية</Badge>}
+                        </div>
+                        <ChevronDown className="h-3 w-3 transition-transform group-data-[state=open]:rotate-180" />
+                      </button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="pr-1 mt-1">
+                      <div className="flex flex-col gap-1">
+                        {yMonths.map((m: any) => {
+                          const to = `/months/${m.slug}` as const;
+                          const active = location.pathname === to;
+                          return (
+                            <Link key={m.id} to={to} onClick={onNavigate}
+                              className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm ${
+                                active ? "bg-primary/10 text-primary font-semibold" : "hover:bg-sidebar-accent"
+                              }`}>
+                              <span>{m.emoji ?? "📅"}</span>
+                              <span>{m.name_ar}</span>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
                 );
               })
             )}
