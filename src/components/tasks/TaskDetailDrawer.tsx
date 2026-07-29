@@ -237,10 +237,10 @@ export function TaskDetailDrawer({ taskId, open, onClose }: { taskId: string | n
       </Sheet>
 
       {quickOpen && (
-        <QuickUpdateDialog task={task} profiles={profiles} onClose={() => setQuickOpen(false)} />
+        <QuickUpdateDialog task={task} profiles={profiles} statusOptions={statusOptions} onClose={() => setQuickOpen(false)} />
       )}
       {editOpen && (
-        <FullEditDialog task={task} profiles={profiles} canEdit={canEdit} onClose={() => setEditOpen(false)} />
+        <FullEditDialog task={task} profiles={profiles} canEdit={canEdit} statusOptions={statusOptions} onClose={() => setEditOpen(false)} />
       )}
       <AlertDialog open={archiveConfirm} onOpenChange={setArchiveConfirm}>
         <AlertDialogContent dir="rtl">
